@@ -1814,5 +1814,5 @@ p, li, span {
   margin-top: 30px;
   margin-bottom: 70px;
   white-space: nowrap;
-  font-size: clamp(0.45rem, 2.5vw, 0.7rem);
+  font-size: clamp(0.4rem, 2vw, 0.6rem);
 }
