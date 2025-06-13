@@ -541,30 +541,8 @@
       animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1);
     }
 
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
     .scale-in {
       animation: scaleIn 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-    }
-
-    @keyframes scaleIn {
-      from {
-        opacity: 0;
-        transform: scale(0.8);
-      }
-      to {
-        opacity: 1;
-        transform: scale(1);
-      }
     }
 
     /* Loading States */
@@ -586,13 +564,6 @@
       border-top-color: transparent;
       animation: spin 1s linear infinite;
     }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
         /* 1. Let dropdowns escape their card/container */
     .ai-card-container,
     .ai-horizontal-card {
@@ -671,31 +642,8 @@
     }
   </style>
 </head>
-<script>
-  function updateSnapOffsets() {
-    const header = document.querySelector('.header-bar');
-    const home   = document.getElementById('homeScreen');
-    if (!header || !home) return;
-    const h = header.getBoundingClientRect().height;
-    // 1) tell the container to inset its snap zone
-    home.style.scrollPaddingTop = h + 'px';
-    // 2) shift each section down by the same amount
-    document.querySelectorAll('.kit-section').forEach(sec => {
-      sec.style.scrollMarginTop = h + 'px';
-    });
-  }
-
-  window.addEventListener('load',  updateSnapOffsets);
-  window.addEventListener('resize', updateSnapOffsets);
-  // if your header may change height on scroll (unlikely)
-  // you can also throttle+call it on scroll:
-  // window.addEventListener('scroll', updateSnapOffsets);
-</script>
 
 <body>
-  <!-- Parallax Background -->
-  <div class="parallax-bg"></div>
-
   <!-- Header -->
   <header class="header-bar" id="mainHeader">
     <div class="header-content">
