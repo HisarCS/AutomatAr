@@ -1748,3 +1748,19 @@ p, li, span {
 #createScreen .modal-header {
   position: relative;
 }
+
+/* make the left-side container a positioning context */
+.ai-horizontal-card .card-left-side {
+  position: relative;
+}
+
+/* pin the help “?” into the top-right, out of the way */
+.ai-horizontal-card .help-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  bottom: auto;
+  left: auto;
+  z-index: 1002;
+}
+
