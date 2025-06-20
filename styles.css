@@ -2185,3 +2185,30 @@ p, li, span {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* 1) For both AI and Create screens (they both use .modal-screen) */
+.modal-screen {
+  /* ensure it actually scrolls */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* leave room below the last element */
+  padding-bottom: 100px;
+}
+
+/* 2) Make the AI main container auto-height with bottom padding */
+.ai-main-container {
+  /* remove the fixed 100vh height */
+  height: auto;
+  /* but cap its maximum so header/footer still work */
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  /* leave extra space under the last card */
+  padding-bottom: 100px;
+}
+
+/* 3) Likewise for your Create screen */
+#createScreen {
+  overflow-y: auto;
+  /* leave room under your “Open AR” button */
+  padding-bottom: 100px;
+}
