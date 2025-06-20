@@ -2212,3 +2212,14 @@ p, li, span {
   /* leave room under your “Open AR” button */
   padding-bottom: 100px;
 }
+
+/* ——— Make Create screen fully scrollable and give extra bottom space ——— */
+#createScreen {
+  /* override the 100vh cap so it can grow beyond one screen */
+  height: auto !important;
+  max-height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* leave room under the fixed bottom button */
+  padding-bottom: 200px !important;
+}
