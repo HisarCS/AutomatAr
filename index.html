@@ -1976,26 +1976,14 @@ class CohereAITester {
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      const aiExplanation = data.generations[0].text.trim();
-      
-      // Store answer and explanation for later reveal
       this.currentAnswer = scenario.winner;
-      this.currentExplanation = aiExplanation;
-      
-      // Return scenario WITHOUT answer and explanation
-      return `Mechanisms: ${kit1Clean} vs. ${kit2Clean}
-Objective: ${scenario.objective}
-Prompt: "${scenario.prompt}"`;
-      
-    } catch (error) {
-      // Fallback to pre-written explanation if AI fails
-      this.currentAnswer = scenario.winner;
-      this.currentExplanation = `${scenario.winner} mechanisms provide ${scenario.reason}, making them more effective for ${seaModel} movement compared to ${scenario.loser} systems.`;
-      
-      return `Mechanisms: ${kit1Clean} vs. ${kit2Clean}
-Objective: ${scenario.objective}
-Prompt: "${scenario.prompt}"`;
-    }
+          this.currentExplanation = data.generations[0].text.trim();
+        } catch (error) {
+          this.currentAnswer = scenario.winner;
+          this.currentExplanation = `${scenario.winner} mechanisms provide ${scenario.reason}, making them more effective for ${seaModel} movement compared to ${scenario.loser} systems.`;
+        }
+  
+        return `Mechanisms: ${kit1Clean} vs. ${kit2Clean}\nObjective: ${scenario.objective}\nPrompt: "${scenario.prompt}"`;
   }
 
   revealAnswer() {
