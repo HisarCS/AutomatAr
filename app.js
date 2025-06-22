@@ -1597,9 +1597,9 @@ class CreateManager {
 /********************************************
  * AR MANAGER WITH ANIMATION INTEGRATION
  ********************************************/
-
 /********************************************
- * COMPLETE AR MANAGER WITH ANIMATION SELECTION
+ * AR MANAGER WITH POSE-ESTIMATED 2D ANIMATIONS
+ * Using POSIT pose estimation for natural 2D overlay behavior
  ********************************************/
 
 class ARManager {
@@ -1624,10 +1624,11 @@ class ARManager {
     this.CONFIDENCE_THRESHOLD = 3;
     this.lastActiveIdentifierTag = null;
     
-    // 2D Overlay Animation System
+    // Pose-Estimated 2D Overlay Animation System
     this.overlayContainer = null;
     this.activeOverlays = new Map();
     this.animationIntervals = new Map();
+    this.markerPoses = new Map(); // Store pose estimation data
     
     // Animation Library Cache
     this.animationLibrary = new Map();
@@ -1643,8 +1644,28 @@ class ARManager {
     this.settingsButton = null;
     
     // Currently detected markers tracking
-    this.currentlyDetectedMarkers = new Map(); // markerId -> marker object
-    this.markersWithMultipleAnimations = new Map(); // markerId -> animations array
+    this.currentlyDetectedMarkers = new Map();
+    this.markersWithMultipleAnimations = new Map();
+    
+    // Enhanced Pose-based 2D Animation Properties - OPTIMIZED RESIZING
+    this.baseOverlaySize = 300; // Larger base size
+    this.minScale = 0.6; // Allow smaller minimum
+    this.maxScale = 4.5; // Allow larger maximum
+    this.scaleDistanceRef = 80; // Reference distance
+    this.rotationSensitivity = 1.0; // Rotation sensitivity
+    this.positionSmoothing = 0.3; // Increased smoothing for stability
+    this.scaleSmoothing = 0.25; // More scale smoothing for natural feel
+    this.rotationSmoothing = 0.3; // More rotation smoothing
+    
+    // New resizing parameters
+    this.referenceMarkerSize = 60; // Reference marker size in pixels
+    this.scaleMultiplier = 1.8; // Amplify scaling effect
+    this.scalePower = 0.8; // Non-linear scaling (less than 1 = more gradual)
+    
+    // Smoothing storage
+    this.smoothedPositions = new Map();
+    this.smoothedScales = new Map();
+    this.smoothedRotations = new Map();
   }
 
   async init() {
@@ -1656,7 +1677,7 @@ class ARManager {
       await this.initCamera();
       this.initRenderer();
       this.initSTLLoader();
-      this.initOverlaySystem();
+      this.initPoseEstimated2DSystem();
       this.initAnimationSelector();
       
       // Load animations from cloud
@@ -1664,8 +1685,11 @@ class ARManager {
       
       this.startRenderLoop();
       
+      // Expose scaling controls for debugging
+      ARManager.exposeScalingControls(this);
+      
       this.isInitialized = true;
-      Utils.log('Complete ARManager with Animation Selection initialized successfully', 'success');
+      Utils.log('ARManager with Pose-Estimated 2D Animations initialized successfully', 'success');
     } catch (error) {
       Utils.log(`AR initialization failed: ${error.message}`, 'error');
       throw error;
@@ -1673,7 +1697,7 @@ class ARManager {
   }
 
   /********************************************
-   * CORE AR INITIALIZATION METHODS
+   * CORE AR INITIALIZATION METHODS (UNCHANGED)
    ********************************************/
 
   initElements() {
@@ -1799,7 +1823,11 @@ class ARManager {
     this.stlLoader = new THREE.STLLoader();
   }
 
-  initOverlaySystem() {
+  /********************************************
+   * POSE-ESTIMATED 2D OVERLAY SYSTEM
+   ********************************************/
+
+  initPoseEstimated2DSystem() {
     this.overlayContainer = document.createElement('div');
     this.overlayContainer.id = 'arAnimationOverlay';
     this.overlayContainer.style.cssText = `
@@ -1815,12 +1843,327 @@ class ARManager {
     const threeContainer = Utils.$('threeContainer');
     if (threeContainer) {
       threeContainer.appendChild(this.overlayContainer);
-      Utils.log('2D Animation Overlay System initialized', 'success');
+      Utils.log('Pose-Estimated 2D Animation System initialized', 'success');
     }
   }
 
   /********************************************
-   * ANIMATION SELECTION SYSTEM
+   * POSE ESTIMATION FOR 2D ANIMATIONS
+   ********************************************/
+
+  calculatePoseFor2D(marker) {
+    try {
+      // Use same corner mapping as 3D models
+      const corners = marker.corners.map(corner => ({
+        x: corner.x - (this.canvas.width / 2),
+        y: (this.canvas.height / 2) - corner.y
+      }));
+
+      // Get 3D pose using POSIT
+      const pose = this.posit.pose(corners);
+      
+      // Calculate useful 2D properties from 3D pose
+      const distance = Math.sqrt(
+        pose.bestTranslation[0] * pose.bestTranslation[0] +
+        pose.bestTranslation[1] * pose.bestTranslation[1] +
+        pose.bestTranslation[2] * pose.bestTranslation[2]
+      );
+
+      // Extract Z-rotation (most useful for 2D)
+      const rotationMatrix = pose.bestRotation;
+      const zRotation = Math.atan2(rotationMatrix[1][0], rotationMatrix[0][0]);
+      
+      // Calculate scale based on distance
+      const scale = Math.max(
+        this.minScale,
+        Math.min(this.maxScale, this.scaleDistanceRef / distance)
+      );
+
+      // Get marker center in screen coordinates (more precise calculation)
+      const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
+      const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
+
+      // Boost scale for better visibility
+      const boostedScale = Math.max(
+        this.minScale,
+        Math.min(this.maxScale, (this.scaleDistanceRef / distance) * 1.2) // 20% size boost
+      );
+
+      return {
+        screenX: centerX,
+        screenY: centerY,
+        distance: distance,
+        scale: boostedScale,
+        rotation: zRotation,
+        confidence: pose.bestError ? 1 / (1 + pose.bestError * 0.01) : 1,
+        pose3D: pose
+      };
+    } catch (error) {
+      Utils.log(`Pose calculation failed for 2D: ${error.message}`, 'warning');
+      return null;
+    }
+  }
+
+  /********************************************
+   * SMOOTH VALUE INTERPOLATION
+   ********************************************/
+
+  smoothValue(current, target, factor) {
+    return current + (target - current) * factor;
+  }
+
+  smoothPosition(markerId, targetX, targetY) {
+    const key = `${markerId}_pos`;
+    const current = this.smoothedPositions.get(key) || { x: targetX, y: targetY };
+    
+    const smoothed = {
+      x: this.smoothValue(current.x, targetX, this.positionSmoothing),
+      y: this.smoothValue(current.y, targetY, this.positionSmoothing)
+    };
+    
+    this.smoothedPositions.set(key, smoothed);
+    return smoothed;
+  }
+
+  smoothScale(markerId, targetScale) {
+    const current = this.smoothedScales.get(markerId) || targetScale;
+    const smoothed = this.smoothValue(current, targetScale, this.scaleSmoothing);
+    this.smoothedScales.set(markerId, smoothed);
+    return smoothed;
+  }
+
+  smoothRotation(markerId, targetRotation) {
+    const current = this.smoothedRotations.get(markerId) || targetRotation;
+    
+    // Handle rotation wrap-around (shortest path)
+    let diff = targetRotation - current;
+    if (diff > Math.PI) diff -= 2 * Math.PI;
+    if (diff < -Math.PI) diff += 2 * Math.PI;
+    
+    const smoothed = current + diff * this.rotationSmoothing;
+    this.smoothedRotations.set(markerId, smoothed);
+    return smoothed;
+  }
+
+  /********************************************
+   * ENHANCED SCALING VALIDATION AND ADJUSTMENT
+   ********************************************/
+
+  validateAndAdjustScale(rawScale, markerSize) {
+    // Prevent extreme scaling that could cause issues
+    if (rawScale < this.minScale * 0.5) {
+      Utils.log(`Scale too small (${rawScale.toFixed(2)}), adjusting to minimum`, 'warning');
+      return this.minScale;
+    }
+    
+    if (rawScale > this.maxScale * 1.2) {
+      Utils.log(`Scale too large (${rawScale.toFixed(2)}), adjusting to maximum`, 'warning');
+      return this.maxScale;
+    }
+    
+    // Log scaling info for debugging
+    if (markerSize < 20) {
+      Utils.log(`Very small marker detected (${markerSize.toFixed(1)}px) - may affect scaling`, 'info');
+    }
+    
+    if (markerSize > 200) {
+      Utils.log(`Very large marker detected (${markerSize.toFixed(1)}px) - may affect scaling`, 'info');
+    }
+    
+    return rawScale;
+  }
+
+  // Dynamic scaling adjustment method
+  adjustScalingParameters(newReferenceSize, newMultiplier, newPower) {
+    this.referenceMarkerSize = newReferenceSize || this.referenceMarkerSize;
+    this.scaleMultiplier = newMultiplier || this.scaleMultiplier;
+    this.scalePower = newPower || this.scalePower;
+    
+    Utils.log(`Scaling parameters updated: ref=${this.referenceMarkerSize}, mult=${this.scaleMultiplier}, power=${this.scalePower}`, 'info');
+    
+    // Update all active overlays with new scaling
+    this.activeOverlays.forEach((animState, markerId) => {
+      if (animState.marker) {
+        this.updateOverlayWithPose(markerId, animState.marker);
+      }
+    });
+  }
+
+  // Helper method for real-time scaling debugging
+  logScalingInfo(markerId, markerSize, scale) {
+    const ratio = markerSize / this.referenceMarkerSize;
+    console.log(`[Scaling Debug] Marker ${markerId}: size=${markerSize.toFixed(1)}px, ratio=${ratio.toFixed(2)}, scale=${scale.toFixed(2)}`);
+  }
+
+  /********************************************
+   * ENHANCED 2D ANIMATION SYSTEM
+   ********************************************/
+
+  start2DAnimation(markerId, animation, marker) {
+    this.stop2DAnimation(markerId);
+
+    Utils.log(`Starting pose-estimated 2D animation "${animation.name}" for marker ${markerId}`, 'success');
+
+    // Create overlay element
+    const overlay = document.createElement('div');
+    overlay.className = 'ar-animation-overlay-pose';
+    overlay.style.cssText = `
+      position: absolute;
+      width: ${this.baseOverlaySize}px;
+      height: ${this.baseOverlaySize}px;
+      border-radius: 12px;
+      overflow: hidden;
+      display: none;
+      transform-origin: center center;
+      transition: opacity 0.2s ease;
+      will-change: transform;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      z-index: 100;
+    `;
+
+    const img = document.createElement('img');
+    img.style.cssText = `
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 10px;
+      display: block;
+    `;
+
+    overlay.appendChild(img);
+    this.overlayContainer.appendChild(overlay);
+
+    const animState = {
+      element: overlay,
+      img: img,
+      animation: animation,
+      currentFrame: 0,
+      marker: marker
+    };
+
+    this.activeOverlays.set(markerId, animState);
+
+    // Start animation frame cycling
+    const frameInterval = 1000 / (animation.metadata.frameRate || 2);
+    const intervalId = setInterval(() => {
+      this.updateAnimationFrame(markerId);
+    }, frameInterval);
+
+    this.animationIntervals.set(markerId, intervalId);
+
+    // Initial positioning
+    this.updateOverlayWithPose(markerId, marker);
+    this.updateAnimationFrame(markerId);
+  }
+
+  updateOverlayWithPose(markerId, marker) {
+    const animState = this.activeOverlays.get(markerId);
+    if (!animState || !marker) return;
+
+    try {
+      // Calculate pose-based properties
+      const poseData = this.calculatePoseFor2D(marker);
+      if (!poseData) {
+        animState.element.style.display = 'none';
+        return;
+      }
+
+      // Store pose data
+      this.markerPoses.set(markerId, poseData);
+
+      // Convert to container coordinates with better precision
+      const container = Utils.$('threeContainer');
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const scaleX = rect.width / this.canvas.width;
+      const scaleY = rect.height / this.canvas.height;
+
+      // More precise screen coordinate calculation
+      const targetScreenX = poseData.screenX * scaleX;
+      const targetScreenY = poseData.screenY * scaleY;
+
+      // Apply smoothing
+      const smoothedPos = this.smoothPosition(markerId, targetScreenX, targetScreenY);
+      const smoothedScale = this.smoothScale(markerId, poseData.scale);
+      const smoothedRotation = this.smoothRotation(markerId, poseData.rotation);
+
+      // Update overlay transform and position
+      this.applyPoseToOverlay(animState, smoothedPos, smoothedScale, smoothedRotation);
+
+      // Update marker reference
+      animState.marker = marker;
+
+    } catch (error) {
+      Utils.log(`Pose update failed for marker ${markerId}: ${error.message}`, 'warning');
+      animState.element.style.display = 'none';
+    }
+  }
+
+  applyPoseToOverlay(animState, position, scale, rotation) {
+    const element = animState.element;
+    
+    // Calculate actual size after scaling
+    const actualSize = this.baseOverlaySize * scale;
+    const halfSize = actualSize / 2;
+    
+    // Position (properly centered on marker)
+    element.style.left = (position.x - halfSize) + 'px';
+    element.style.top = (position.y - halfSize) + 'px';
+    
+    // Apply scale and rotation - CORRECTED rotation direction
+    const rotationDeg = -rotation * (180 / Math.PI) * this.rotationSensitivity; // Negated
+    element.style.transform = `scale(${scale}) rotate(${rotationDeg}deg)`;
+    
+    // FULLY OPAQUE - no more transparency issues
+    element.style.opacity = '1.0';
+    
+    // Show element
+    element.style.display = 'block';
+  }
+
+  updateAnimationFrame(markerId) {
+    const animState = this.activeOverlays.get(markerId);
+    if (!animState) return;
+
+    animState.currentFrame = (animState.currentFrame + 1) % animState.animation.frames.length;
+    
+    const currentFrame = animState.animation.frames[animState.currentFrame];
+    if (currentFrame && currentFrame.url) {
+      animState.img.src = currentFrame.url;
+    }
+  }
+
+  updateAllPoseBasedAnimations() {
+    this.activeOverlays.forEach((animState, markerId) => {
+      if (animState.marker) {
+        this.updateOverlayWithPose(markerId, animState.marker);
+      }
+    });
+  }
+
+  stop2DAnimation(markerId) {
+    const intervalId = this.animationIntervals.get(markerId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.animationIntervals.delete(markerId);
+    }
+
+    const animState = this.activeOverlays.get(markerId);
+    if (animState) {
+      animState.element.remove();
+      this.activeOverlays.delete(markerId);
+    }
+
+    // Clean up smoothing data
+    this.smoothedPositions.delete(`${markerId}_pos`);
+    this.smoothedScales.delete(markerId);
+    this.smoothedRotations.delete(markerId);
+    this.markerPoses.delete(markerId);
+  }
+
+  /********************************************
+   * ANIMATION SELECTION SYSTEM (UNCHANGED)
    ********************************************/
 
   initAnimationSelector() {
@@ -1899,7 +2242,6 @@ class ARManager {
       arScreen.appendChild(this.selectorMenu);
     }
 
-    // Close menu when clicking outside
     this.selectorMenu.onclick = (e) => {
       if (e.target === this.selectorMenu) {
         this.hideAnimationMenu();
@@ -1945,7 +2287,6 @@ class ARManager {
 
     this.settingsButton.onclick = () => this.handleSettingsButtonClick();
 
-    // Add text to the button
     const buttonText = document.createElement('span');
     buttonText.textContent = 'Animation Settings';
     buttonText.style.fontSize = '0.8rem';
@@ -1953,18 +2294,14 @@ class ARManager {
     
     this.settingsButton.appendChild(buttonText);
 
-    // Find the AR sidebar and add the button before the debug button
     const arSidebar = document.querySelector('.ar-sidebar');
     const debugButton = document.getElementById('debugSideBtn');
     
     if (arSidebar && debugButton) {
-      // Insert the animation settings button before the debug button
       arSidebar.insertBefore(this.settingsButton, debugButton);
     } else if (arSidebar) {
-      // If no debug button found, add to end of sidebar
       arSidebar.appendChild(this.settingsButton);
     } else {
-      // Fallback: add to AR screen
       const arScreen = document.getElementById('arScreen');
       if (arScreen) {
         arScreen.appendChild(this.settingsButton);
@@ -1973,7 +2310,7 @@ class ARManager {
   }
 
   /********************************************
-   * ANIMATION LIBRARY MANAGEMENT
+   * ANIMATION LIBRARY MANAGEMENT (UNCHANGED)
    ********************************************/
 
   async loadAnimationsFromCloud() {
@@ -1983,7 +2320,7 @@ class ARManager {
     }
 
     this.loadingAnimations = true;
-    Utils.log('Loading animations from cloud for AR...', 'info');
+    Utils.log('Loading animations from cloud for pose-estimated AR...', 'info');
 
     try {
       const createManager = this.getCreateManager();
@@ -2003,11 +2340,9 @@ class ARManager {
         return;
       }
       
-      // Clear existing caches
       this.animationLibrary.clear();
       this.animationsByMarker.clear();
       
-      // Process and cache animations
       let successCount = 0;
       for (const animation of animations) {
         try {
@@ -2015,7 +2350,6 @@ class ARManager {
             const processedAnimation = this.processAnimationData(animation);
             this.animationLibrary.set(animation.id, processedAnimation);
             
-            // Group animations by marker tags
             animation.marker_tags.forEach(tag => {
               const markerId = this.normalizeMarkerId(tag);
               
@@ -2038,7 +2372,7 @@ class ARManager {
       }
       
       this.animationsLoaded = true;
-      Utils.log(`Loaded ${successCount}/${animations.length} animations for AR`, 'success');
+      Utils.log(`Loaded ${successCount}/${animations.length} animations for pose-estimated AR`, 'success');
       Utils.log(`Grouped animations by ${this.animationsByMarker.size} unique markers`, 'info');
       
     } catch (error) {
@@ -2094,46 +2428,23 @@ class ARManager {
     return markerId;
   }
 
-  async refreshAnimations() {
-    Utils.log('Refreshing animation cache...', 'info');
-    this.animationsLoaded = false;
-    this.animationLibrary.clear();
-    this.animationsByMarker.clear();
-    
-    // Stop all active animations
-    this.animationIntervals.forEach(intervalId => clearInterval(intervalId));
-    this.animationIntervals.clear();
-    this.activeOverlays.forEach(animState => animState.element.remove());
-    this.activeOverlays.clear();
-    
-    await this.loadAnimationsFromCloud();
-  }
-
-  /********************************************
-   * ANIMATION SELECTION LOGIC
-   ********************************************/
-
   getAnimationForMarker(markerId) {
     try {
       const normalizedId = this.normalizeMarkerId(markerId);
       const animations = this.animationsByMarker.get(normalizedId);
 
       if (!animations || animations.length === 0) {
-        // Remove from multiple animations tracking if it was there
         this.markersWithMultipleAnimations.delete(normalizedId);
         return null;
       }
 
       if (animations.length === 1) {
-        // Only one animation available - use it directly
         this.markersWithMultipleAnimations.delete(normalizedId);
         return animations[0];
       }
 
-      // Multiple animations available - track this marker but don't show menu automatically
       this.markersWithMultipleAnimations.set(normalizedId, animations);
 
-      // Check user preference
       const preferredAnimationId = this.markerAnimationPreferences.get(normalizedId);
       
       if (preferredAnimationId) {
@@ -2143,7 +2454,6 @@ class ARManager {
         }
       }
 
-      // No preference set - return first animation as default (menu will only show when button pressed)
       return animations[0];
       
     } catch (error) {
@@ -2153,25 +2463,22 @@ class ARManager {
   }
 
   showAnimationSelectionMenu(markerId, animations) {
-    // Only show selection menu if there are multiple animations
     if (!animations || animations.length <= 1) {
       return;
     }
 
     if (this.isMenuVisible && this.currentMarkerForSelection === markerId) {
-      return; // Menu already open for this marker
+      return;
     }
 
     this.currentMarkerForSelection = markerId;
     this.isMenuVisible = true;
 
-    // Update subtitle
     const subtitle = document.getElementById('animationSelectorSubtitle');
     if (subtitle) {
-      subtitle.textContent = `Multiple animations available for Marker ID: ${markerId}. Select your preferred animation (menu stays open for easy switching):`;
+      subtitle.textContent = `Multiple animations available for Marker ID: ${markerId}. Select your preferred animation (pose-estimated positioning):`;
     }
 
-    // Determine which animation is currently selected
     const currentPreference = this.markerAnimationPreferences.get(markerId);
     let currentlySelectedAnimation = null;
     
@@ -2179,12 +2486,10 @@ class ARManager {
       currentlySelectedAnimation = animations.find(anim => anim.id === currentPreference);
     }
     
-    // If no preference or preference not found, default to first animation
     if (!currentlySelectedAnimation) {
       currentlySelectedAnimation = animations[0];
     }
 
-    // Clear and populate content
     const content = document.getElementById('animationSelectorContent');
     content.innerHTML = '';
 
@@ -2194,7 +2499,6 @@ class ARManager {
       content.appendChild(optionCard);
     });
 
-    // Show menu with animation
     this.selectorMenu.style.display = 'block';
     this.selectorMenu.style.opacity = '0';
     this.selectorMenu.style.transform = 'translate(-50%, -50%) scale(0.8)';
@@ -2205,58 +2509,7 @@ class ARManager {
       this.selectorMenu.style.transform = 'translate(-50%, -50%) scale(1)';
     }, 10);
 
-    Utils.log(`Showing animation selection menu for marker ${markerId} with ${animations.length} options, currently selected: ${currentlySelectedAnimation.name}`, 'info');
-  }
-
-  showNoAnimationsMessage(markerId) {
-    // Create temporary "no animations" notification
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 69, 0, 0.9);
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      z-index: 2500;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-      opacity: 0;
-      transition: all 0.3s ease;
-    `;
-    
-    notification.textContent = `No animations available for Marker ID: ${markerId}`;
-    
-    const arScreen = document.getElementById('arScreen');
-    if (arScreen) {
-      arScreen.appendChild(notification);
-    } else {
-      document.body.appendChild(notification);
-    }
-    
-    // Show with animation
-    setTimeout(() => {
-      notification.style.opacity = '1';
-      notification.style.transform = 'translateX(-50%) translateY(10px)';
-    }, 10);
-    
-    // Auto-hide after 2 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transform = 'translateX(-50%) translateY(-10px)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 2000);
-
-    Utils.log(`No animations found for marker ${markerId}`, 'info');
+    Utils.log(`Showing pose-estimated animation selection menu for marker ${markerId} with ${animations.length} options`, 'info');
   }
 
   createAnimationOptionCard(animation, markerId, isSelected = false) {
@@ -2288,7 +2541,6 @@ class ARManager {
       }
     };
 
-    // Preview image container with selection button in TOP-LEFT corner
     const preview = document.createElement('div');
     preview.className = 'animation-preview';
     preview.style.cssText = `
@@ -2297,7 +2549,6 @@ class ARManager {
       position: relative;
     `;
 
-    // Selection button positioned in TOP-LEFT corner of preview (camera view)
     const selectionButton = document.createElement('div');
     selectionButton.className = 'selection-indicator';
     selectionButton.style.cssText = `
@@ -2336,17 +2587,15 @@ class ARManager {
       img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; border-radius: 6px;';
       img.onerror = () => {
         preview.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">No Preview</span>';
-        preview.appendChild(selectionButton); // Re-add button after error
+        preview.appendChild(selectionButton);
       };
       preview.appendChild(img);
     } else {
       preview.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">No Preview</span>';
     }
 
-    // Add selection button to TOP-LEFT of preview
     preview.appendChild(selectionButton);
 
-    // Animation info
     const info = document.createElement('div');
     info.style.cssText = 'flex: 1; min-width: 0;';
 
@@ -2362,7 +2611,7 @@ class ARManager {
     const createdAt = animation.metadata?.createdAt ? 
       new Date(animation.metadata.createdAt).toLocaleDateString() : 'Unknown';
 
-    details.innerHTML = `${frameCount} frames • ${frameRate.toFixed(1)} FPS<br>
+    details.innerHTML = `${frameCount} frames • ${frameRate.toFixed(1)} FPS • <span style="color: #4CAF50;">Pose Tracking</span><br>
       <span style="font-size: 0.75rem; opacity: 0.8;">Created: ${createdAt}</span>`;
 
     info.appendChild(name);
@@ -2377,38 +2626,31 @@ class ARManager {
   }
 
   selectAnimation(markerId, animationId, selectedCard) {
-    // Update preference
     this.markerAnimationPreferences.set(markerId, animationId);
     this.saveUserPreferences();
 
-    // Update UI to show new selection
     const content = document.getElementById('animationSelectorContent');
     const cards = content.querySelectorAll('.animation-option-card');
     
     cards.forEach(card => {
-      // Find the indicator (positioned absolutely in the preview container)
       const preview = card.querySelector('.animation-preview');
       const indicator = preview ? preview.querySelector('.selection-indicator') : null;
       
       if (card === selectedCard) {
-        // Selected card styling
         card.style.background = 'rgba(255, 140, 0, 0.2)';
         card.style.borderColor = '#FF8C00';
         card.classList.add('selected');
         
-        // Update indicator for selected state
         if (indicator) {
           indicator.style.borderColor = '#FF8C00';
           indicator.style.background = '#FF8C00';
           indicator.innerHTML = '<div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div>';
         }
       } else {
-        // Unselected card styling
         card.style.background = 'rgba(255, 255, 255, 0.05)';
         card.style.borderColor = 'rgba(255, 255, 255, 0.1)';
         card.classList.remove('selected');
         
-        // Update indicator for unselected state
         if (indicator) {
           indicator.style.borderColor = 'rgba(255, 255, 255, 0.6)';
           indicator.style.background = 'transparent';
@@ -2417,25 +2659,17 @@ class ARManager {
       }
     });
 
-    // Get animation name for feedback
     const animations = this.animationsByMarker.get(markerId);
     const selectedAnimation = animations.find(anim => anim.id === animationId);
     const animationName = selectedAnimation ? selectedAnimation.name : 'animation';
 
-    Utils.log(`Selected animation ${animationId} for marker ${markerId}`, 'success');
+    Utils.log(`Selected pose-estimated animation ${animationId} for marker ${markerId}`, 'success');
 
-    // Show brief feedback that the selection changed
     this.showSelectionFeedback(markerId, animationName);
-
-    // Immediately refresh the animation without closing the menu
     this.stop2DAnimation(markerId);
-    
-    // The new animation will start on the next frame when the marker is detected again
-    // Menu stays open for further selections if needed
   }
 
   showSelectionFeedback(markerId, animationName) {
-    // Create brief feedback notification
     const feedback = document.createElement('div');
     feedback.style.cssText = `
       position: fixed;
@@ -2456,7 +2690,7 @@ class ARManager {
       transition: all 0.3s ease;
     `;
     
-    feedback.textContent = `✓ Now playing: ${animationName}`;
+    feedback.innerHTML = `✓ Now playing: <strong>${animationName}</strong><br><span style="font-size: 0.8rem; opacity: 0.9;">With pose estimation tracking</span>`;
     
     const arScreen = document.getElementById('arScreen');
     if (arScreen) {
@@ -2465,13 +2699,11 @@ class ARManager {
       document.body.appendChild(feedback);
     }
     
-    // Show with animation
     setTimeout(() => {
       feedback.style.opacity = '1';
       feedback.style.transform = 'translateX(-50%) translateY(5px)';
     }, 10);
     
-    // Auto-hide after 1.5 seconds
     setTimeout(() => {
       feedback.style.opacity = '0';
       feedback.style.transform = 'translateX(-50%) translateY(-5px)';
@@ -2480,7 +2712,7 @@ class ARManager {
           feedback.parentNode.removeChild(feedback);
         }
       }, 300);
-    }, 1500);
+    }, 2000);
   }
 
   hideAnimationMenu() {
@@ -2497,24 +2729,20 @@ class ARManager {
   }
 
   handleSettingsButtonClick() {
-    // Check for currently detected markers with multiple animations
     const markersWithMultiple = Array.from(this.markersWithMultipleAnimations.keys());
     
     if (markersWithMultiple.length === 0) {
-      // No markers with multiple animations detected
       this.showNoMultipleAnimationsMessage();
       return;
     }
     
     if (markersWithMultiple.length === 1) {
-      // Only one marker with multiple animations - show selection menu directly
       const markerId = markersWithMultiple[0];
       const animations = this.markersWithMultipleAnimations.get(markerId);
       this.showAnimationSelectionMenu(markerId, animations);
       return;
     }
     
-    // Multiple markers with multiple animations - show marker selection menu
     this.showMarkerSelectionMenu(markersWithMultiple);
   }
 
@@ -2559,13 +2787,11 @@ class ARManager {
       document.body.appendChild(notification);
     }
     
-    // Show with animation
     setTimeout(() => {
       notification.style.opacity = '1';
       notification.style.transform = 'translateX(-50%) translateY(10px)';
     }, 10);
     
-    // Auto-hide after 3 seconds
     setTimeout(() => {
       notification.style.opacity = '0';
       notification.style.transform = 'translateX(-50%) translateY(-10px)';
@@ -2611,7 +2837,7 @@ class ARManager {
                        width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">×</button>
       </div>
       <p style="margin: 0 0 1.5rem 0; color: rgba(255, 255, 255, 0.8); line-height: 1.4;">
-        Multiple markers with animation choices detected. Select which marker to configure:
+        Multiple markers with pose-estimated animation choices detected. Select which marker to configure:
       </p>
     `;
 
@@ -2651,7 +2877,8 @@ class ARManager {
         <div>
           <div style="color: white; font-weight: 600; margin-bottom: 0.3rem;">Marker ID: ${markerId}</div>
           <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">
-            Current: ${selectedAnimation.name} (${animations.length} available)
+            Current: ${selectedAnimation.name} (${animations.length} available)<br>
+            <span style="color: #4CAF50; font-size: 0.8rem;">● Pose estimation tracking</span>
           </div>
         </div>
         <div style="color: #FF8C00; font-size: 1.2rem;">→</div>
@@ -2674,30 +2901,6 @@ class ARManager {
     };
   }
 
-  resetMarkerPreference(markerId) {
-    // Remove current preference to trigger selection menu on next scan
-    this.markerAnimationPreferences.delete(markerId);
-    this.saveUserPreferences();
-    
-    // Close settings menu
-    const settingsMenu = document.getElementById('animationSettingsMenu');
-    if (settingsMenu) {
-      settingsMenu.remove();
-    }
-    
-    // Stop current animation and show selection menu if animations exist
-    this.stop2DAnimation(markerId);
-    const animations = this.animationsByMarker.get(markerId);
-    if (animations && animations.length > 1) {
-      // Show selection menu immediately
-      setTimeout(() => {
-        this.showAnimationSelectionMenu(markerId, animations);
-      }, 300);
-    }
-    
-    Utils.log(`Reset animation preference for marker ${markerId} - selection menu will appear on next scan`, 'info');
-  }
-
   saveUserPreferences() {
     try {
       const preferences = {};
@@ -2718,7 +2921,7 @@ class ARManager {
         Object.entries(preferences).forEach(([markerId, animationId]) => {
           this.markerAnimationPreferences.set(parseInt(markerId), animationId);
         });
-        Utils.log(`Loaded ${Object.keys(preferences).length} animation preferences`, 'info');
+        Utils.log(`Loaded ${Object.keys(preferences).length} animation preferences for pose-estimated AR`, 'info');
       }
     } catch (error) {
       Utils.log('Failed to load user preferences', 'warning');
@@ -2726,125 +2929,10 @@ class ARManager {
   }
 
   /********************************************
-   * 2D ANIMATION OVERLAY SYSTEM
-   ********************************************/
-
-  start2DAnimation(markerId, animation, marker) {
-    this.stop2DAnimation(markerId);
-
-    Utils.log(`Starting 2D animation "${animation.name}" for marker ${markerId}`, 'success');
-
-    const overlay = document.createElement('div');
-    overlay.className = 'ar-animation-overlay';
-    overlay.style.cssText = `
-      position: absolute;
-      width: 200px;
-      height: 200px;
-      border-radius: 8px;
-      overflow: hidden;
-      display: none;
-      transition: all 0.3s ease;
-    `;
-
-    const img = document.createElement('img');
-    img.style.cssText = `
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 6px;
-    `;
-
-    overlay.appendChild(img);
-    this.overlayContainer.appendChild(overlay);
-
-    const animState = {
-      element: overlay,
-      img: img,
-      animation: animation,
-      currentFrame: 0,
-      marker: marker
-    };
-
-    this.activeOverlays.set(markerId, animState);
-
-    const frameInterval = 1000 / (animation.metadata.frameRate || 2);
-    const intervalId = setInterval(() => {
-      this.updateOverlayFrame(markerId);
-    }, frameInterval);
-
-    this.animationIntervals.set(markerId, intervalId);
-
-    this.positionOverlay(markerId, marker);
-    this.updateOverlayFrame(markerId);
-  }
-
-  updateOverlayFrame(markerId) {
-    const animState = this.activeOverlays.get(markerId);
-    if (!animState) return;
-
-    animState.currentFrame = (animState.currentFrame + 1) % animState.animation.frames.length;
-    
-    const currentFrame = animState.animation.frames[animState.currentFrame];
-    if (currentFrame && currentFrame.url) {
-      animState.img.src = currentFrame.url;
-    }
-  }
-
-  positionOverlay(markerId, marker) {
-    const animState = this.activeOverlays.get(markerId);
-    if (!animState || !marker) return;
-
-    try {
-      const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
-      const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
-
-      const container = Utils.$('threeContainer');
-      if (!container) return;
-
-      const rect = container.getBoundingClientRect();
-      const scaleX = rect.width / this.canvas.width;
-      const scaleY = rect.height / this.canvas.height;
-
-      const screenX = centerX * scaleX;
-      const screenY = centerY * scaleY;
-
-      animState.element.style.left = (screenX - 100) + 'px';
-      animState.element.style.top = (screenY - 100) + 'px';
-      animState.element.style.display = 'block';
-      
-    } catch (error) {
-      animState.element.style.display = 'none';
-    }
-  }
-
-  stop2DAnimation(markerId) {
-    const intervalId = this.animationIntervals.get(markerId);
-    if (intervalId) {
-      clearInterval(intervalId);
-      this.animationIntervals.delete(markerId);
-    }
-
-    const animState = this.activeOverlays.get(markerId);
-    if (animState) {
-      animState.element.remove();
-      this.activeOverlays.delete(markerId);
-    }
-  }
-
-  updateAllAnimations() {
-    this.activeOverlays.forEach((animState, markerId) => {
-      if (animState.marker) {
-        this.positionOverlay(markerId, animState.marker);
-      }
-    });
-  }
-
-  /********************************************
-   * 3D MODEL SYSTEM
+   * 3D MODEL SYSTEM (UNCHANGED)
    ********************************************/
 
   getDirectModelForMarker(markerId) {
-    // Direct mapping of marker IDs to 3D models
     const directModelMap = {
       0: "sea_models/stringray.stl",
       1: "sea_models/jellyfish.stl", 
@@ -2925,7 +3013,7 @@ class ARManager {
   }
 
   /********************************************
-   * CORE AR RENDERING AND SCENE MANAGEMENT
+   * CORE AR RENDERING WITH POSE-ESTIMATED 2D ANIMATIONS
    ********************************************/
 
   startRenderLoop() {
@@ -2948,7 +3036,7 @@ class ARManager {
       const markers = this.detector.detect(imageData);
 
       this.updateScene(markers);
-      this.updateAllAnimations();
+      this.updateAllPoseBasedAnimations(); // Use pose-based update method
 
       this.renderer.autoClear = false;
       this.renderer.clear();
@@ -2958,7 +3046,7 @@ class ARManager {
       this.lastFrameMarkers = markers.slice();
       this.updateDebugInfo(markers);
     } catch (error) {
-      Utils.log(`AR render error: ${error.message}`, 'error');
+      Utils.log(`Pose-estimated AR render error: ${error.message}`, 'error');
     }
   }
 
@@ -3024,12 +3112,12 @@ class ARManager {
       const animation = this.getAnimationForMarker(markerId);
       
       if (animation) {
-        // Display 2D animation overlay
+        // Display pose-estimated 2D animation overlay
         if (!this.activeOverlays.has(markerId)) {
           this.start2DAnimation(markerId, animation, marker);
         } else {
-          // Update position for existing animation
-          this.positionOverlay(markerId, marker);
+          // Update position for existing animation with pose estimation
+          this.updateOverlayWithPose(markerId, marker);
           const animState = this.activeOverlays.get(markerId);
           if (animState) {
             animState.marker = marker;
@@ -3082,7 +3170,6 @@ class ARManager {
           }
           animationCount++;
         } else {
-          // Check if it's a known 3D model scenario
           const activeScenario = extendedScenarios.find(s => s.identifierTag === marker.id);
           if (activeScenario) {
             markerInfos.push(`Model: ${activeScenario.name} (ID: ${marker.id})`);
@@ -3099,7 +3186,7 @@ class ARManager {
         let description = '';
         
         if (animationCount > 0) {
-          description += `${animationCount} animation(s)`;
+          description += `${animationCount} pose-tracked animation(s)`;
         }
         
         if (modelCount > 0) {
@@ -3114,7 +3201,7 @@ class ARManager {
         }
         
         if (multipleAvailable > 0) {
-          description += ` • ${multipleAvailable} marker(s) have multiple animations`;
+          description += ` • ${multipleAvailable} marker(s) have multiple pose-tracked animations`;
         }
         
         if (noAnimationCount > 0) {
@@ -3122,7 +3209,8 @@ class ARManager {
         }
         
         if (this.animationLibrary.size > 0) {
-          description += ` • ${this.animationLibrary.size} animations cached`;
+          description += ` • ${this.animationLibrary.size} pose-tracked animations cached`;
+          description += ` • Scaling: ref=${this.referenceMarkerSize}px, mult=${this.scaleMultiplier}`;
         }
         
         kitDescEl.textContent = description;
@@ -3130,9 +3218,9 @@ class ARManager {
     } else {
       if (kitNameEl) kitNameEl.textContent = 'No markers detected';
       if (kitDescEl) {
-        let description = 'Point your camera at a marker to see content';
+        let description = 'Point your camera at a marker to see pose-tracked content';
         if (this.animationLibrary.size > 0) {
-          description += ` • ${this.animationLibrary.size} animations ready`;
+          description += ` • ${this.animationLibrary.size} pose-tracked animations ready`;
         }
         kitDescEl.textContent = description;
       }
@@ -3166,19 +3254,29 @@ class ARManager {
         debugCtx.fillStyle = 'yellow';
         debugCtx.font = '12px Arial';
         const animation = this.getAnimationForMarker(marker.id);
-        const text = animation ? `ID:${marker.id} (ANIM)` : `ID:${marker.id}`;
+        const text = animation ? `ID:${marker.id} (POSE)` : `ID:${marker.id}`;
         debugCtx.fillText(text, c[0].x, c[0].y - 5);
       });
     }
 
     if (markerInfo) {
       let text = markers.length === 0 ? 'No markers detected.\n' : '';
-      text += `Active 2D animations: ${this.activeOverlays.size}\n`;
+      text += `Active pose-tracked animations: ${this.activeOverlays.size}\n`;
       text += `Animation cache: ${this.animationLibrary.size}\n`;
+      text += `Pose estimation: ENABLED\n`;
       markers.forEach(marker => {
         const animation = this.getAnimationForMarker(marker.id);
         if (animation) {
-          text += `Marker ID ${marker.id} - Playing: "${animation.name}"\n`;
+          const poseData = this.markerPoses.get(marker.id);
+          if (poseData) {
+            text += `Marker ID ${marker.id} - Playing: "${animation.name}"\n`;
+            text += `  • Marker Size: ${poseData.markerSize?.toFixed(1)}px\n`;
+            text += `  • Scale: ${poseData.scale.toFixed(2)}x\n`;
+            text += `  • Rotation: ${(poseData.rotation * 180 / Math.PI).toFixed(1)}°\n`;
+            text += `  • Confidence: ${poseData.confidence.toFixed(2)}\n`;
+          } else {
+            text += `Marker ID ${marker.id} - Playing: "${animation.name}" (Pose-tracked)\n`;
+          }
         } else {
           text += `Marker ID ${marker.id} - 3D Model\n`;
         }
@@ -3195,15 +3293,35 @@ class ARManager {
     Utils.addClass('arInitialOverlay', 'hidden');
     if (!this.isInitialized) {
       this.init().catch(error => {
-        Utils.log(`Failed to start AR: ${error.message}`, 'error');
-        NotificationManager.show('Failed to start AR experience', 'error');
+        Utils.log(`Failed to start pose-estimated AR: ${error.message}`, 'error');
+        NotificationManager.show('Failed to start pose-estimated AR experience', 'error');
       });
     } else {
-      // Refresh animations in case new ones were created
       this.refreshAnimations().catch(error => {
-        Utils.log(`Failed to refresh animations: ${error.message}`, 'warning');
+        Utils.log(`Failed to refresh pose-estimated animations: ${error.message}`, 'warning');
       });
     }
+  }
+
+  async refreshAnimations() {
+    Utils.log('Refreshing pose-estimated animation cache...', 'info');
+    this.animationsLoaded = false;
+    this.animationLibrary.clear();
+    this.animationsByMarker.clear();
+    
+    // Stop all active animations
+    this.animationIntervals.forEach(intervalId => clearInterval(intervalId));
+    this.animationIntervals.clear();
+    this.activeOverlays.forEach(animState => animState.element.remove());
+    this.activeOverlays.clear();
+    
+    // Clear pose tracking data
+    this.markerPoses.clear();
+    this.smoothedPositions.clear();
+    this.smoothedScales.clear();
+    this.smoothedRotations.clear();
+    
+    await this.loadAnimationsFromCloud();
   }
 
   toggleDebug() {
@@ -3253,6 +3371,12 @@ class ARManager {
     this.animationsLoaded = false;
     this.loadingAnimations = false;
     
+    // Clear pose tracking data
+    this.markerPoses.clear();
+    this.smoothedPositions.clear();
+    this.smoothedScales.clear();
+    this.smoothedRotations.clear();
+    
     // Clear marker tracking
     this.currentlyDetectedMarkers.clear();
     this.markersWithMultipleAnimations.clear();
@@ -3287,7 +3411,39 @@ class ARManager {
     this.stlCache.clear();
     this.isInitialized = false;
     
-    Utils.log('Complete ARManager cleaned up', 'info');
+    Utils.log('Pose-Estimated ARManager cleaned up', 'info');
+  }
+
+  /********************************************
+   * GLOBAL SCALING ADJUSTMENT FUNCTIONS
+   ********************************************/
+
+  // Make scaling adjustment available globally for debugging
+  static exposeScalingControls(arManager) {
+    window.adjustARScaling = (referenceSize, multiplier, power) => {
+      if (arManager && arManager.adjustScalingParameters) {
+        arManager.adjustScalingParameters(referenceSize, multiplier, power);
+        console.log(`AR Scaling adjusted - Reference: ${referenceSize || 'unchanged'}, Multiplier: ${multiplier || 'unchanged'}, Power: ${power || 'unchanged'}`);
+      } else {
+        console.error('AR Manager not available or not initialized');
+      }
+    };
+
+    window.getARScalingInfo = () => {
+      if (arManager) {
+        console.log(`Current AR Scaling Parameters:
+          Reference Marker Size: ${arManager.referenceMarkerSize}px
+          Scale Multiplier: ${arManager.scaleMultiplier}
+          Scale Power: ${arManager.scalePower}
+          Min Scale: ${arManager.minScale}
+          Max Scale: ${arManager.maxScale}
+          Active Overlays: ${arManager.activeOverlays.size}`);
+      }
+    };
+
+    console.log('AR Scaling controls exposed:');
+    console.log('  adjustARScaling(referenceSize, multiplier, power) - Adjust scaling parameters');
+    console.log('  getARScalingInfo() - Show current scaling parameters');
   }
 }
 
