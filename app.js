@@ -2063,51 +2063,52 @@ class ARManager {
     }
   }
 
-  positionOverlay(markerId, marker) {
-    const animState = this.activeOverlays.get(markerId);
-    if (!animState || !marker) return;
+ positionOverlay(markerId, marker) {
+  const animState = this.activeOverlays.get(markerId);
+  if (!animState || !marker) return;
 
-    try {
-      const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
-      const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
+  try {
+    // Calculate center position
+    const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
+    const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
 
-      // Calculate rotation angle from marker corners
-      // Use the vector from corner 0 to corner 1 to determine rotation
-      const corner0 = marker.corners[0];
-      const corner1 = marker.corners[1];
-      
-      const deltaX = corner1.x - corner0.x;
-      const deltaY = corner1.y - corner0.y;
-      
-      // Calculate angle in radians, then convert to degrees
-      let rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-      
-      // Normalize angle to 0-360 range
-      if (rotationAngle < 0) {
-        rotationAngle += 360;
-      }
+    // Calculate rotation angle from marker corners
+    // Use the vector from corner 0 to corner 1 to determine rotation
+    const corner0 = marker.corners[0];
+    const corner1 = marker.corners[1];
+    
+    // Calculate angle in radians
+    const deltaX = corner1.x - corner0.x;
+    const deltaY = corner1.y - corner0.y;
+    const rotationRadians = Math.atan2(deltaY, deltaX);
+    
+    // Convert to degrees
+    const rotationDegrees = rotationRadians * (180 / Math.PI);
 
-      const container = Utils.$('threeContainer');
-      if (!container) return;
+    const container = Utils.$('threeContainer');
+    if (!container) return;
 
-      const rect = container.getBoundingClientRect();
-      const scaleX = rect.width / this.canvas.width;
-      const scaleY = rect.height / this.canvas.height;
+    const rect = container.getBoundingClientRect();
+    const scaleX = rect.width / this.canvas.width;
+    const scaleY = rect.height / this.canvas.height;
 
-      const screenX = centerX * scaleX;
-      const screenY = centerY * scaleY;
+    const screenX = centerX * scaleX;
+    const screenY = centerY * scaleY;
 
-      // Apply position and rotation transform
-      animState.element.style.left = (screenX - 100) + 'px';
-      animState.element.style.top = (screenY - 100) + 'px';
-      animState.element.style.transform = `rotate(${rotationAngle}deg)`;
-      animState.element.style.transformOrigin = 'center center';
-      animState.element.style.display = 'block';
-      
-    } catch (error) {
-      animState.element.style.display = 'none';
-    }
+    // Apply position and rotation with CSS transform
+    animState.element.style.left = (screenX - 100) + 'px';
+    animState.element.style.top = (screenY - 100) + 'px';
+    animState.element.style.transform = `rotate(${rotationDegrees}deg)`;
+    animState.element.style.transformOrigin = 'center center';
+    animState.element.style.display = 'block';
+    
+    // Store rotation for smooth transitions (optional)
+    animState.lastRotation = rotationDegrees;
+    
+  } catch (error) {
+    animState.element.style.display = 'none';
   }
+}
 
   stop2DAnimation(markerId) {
     const intervalId = this.animationIntervals.get(markerId);
