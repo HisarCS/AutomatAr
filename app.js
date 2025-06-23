@@ -2003,53 +2003,73 @@ class ARManager {
   }
 
   start2DAnimation(markerId, animation, marker) {
-    this.stop2DAnimation(markerId);
+  this.stop2DAnimation(markerId);
 
-    Utils.log(`Starting 2D animation "${animation.name}" for marker ${markerId}`, 'success');
+  Utils.log(`Starting 2D animation "${animation.name}" for marker ${markerId}`, 'success');
 
-    const overlay = document.createElement('div');
-    overlay.className = 'ar-animation-overlay';
-    overlay.style.cssText = `
-      position: absolute;
-      width: 200px;
-      height: 200px;
-      border-radius: 8px;
-      overflow: hidden;
-      display: none;
-      transition: all 0.3s ease;
-    `;
+  const overlay = document.createElement('div');
+  overlay.className = 'ar-animation-overlay';
+  overlay.style.cssText = `
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: none;
+    transition: all 0.3s ease;
+  `;
 
-    const img = document.createElement('img');
-    img.style.cssText = `
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 6px;
-    `;
+  const img = document.createElement('img');
+  img.style.cssText = `
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+  `;
 
-    overlay.appendChild(img);
-    this.overlayContainer.appendChild(overlay);
+  overlay.appendChild(img);
+  this.overlayContainer.appendChild(overlay);
 
-    const animState = {
-      element: overlay,
-      img: img,
-      animation: animation,
-      currentFrame: 0,
-      marker: marker
-    };
+  const animState = {
+    element: overlay,
+    img: img,
+    animation: animation,
+    currentFrame: 0, // Start at frame 0
+    marker: marker
+  };
 
-    this.activeOverlays.set(markerId, animState);
+  this.activeOverlays.set(markerId, animState);
 
-    const frameInterval = 1000 / (animation.metadata.frameRate || 2);
-    const intervalId = setInterval(() => {
-      this.updateOverlayFrame(markerId);
-    }, frameInterval);
-
-    this.animationIntervals.set(markerId, intervalId);
-
-    this.positionOverlay(markerId, marker);
-    this.updateOverlayFrame(markerId);
+  // Display the first frame immediately (frame 0)
+  const firstFrame = animState.animation.frames[0];
+  if (firstFrame && firstFrame.url) {
+    animState.img.src = firstFrame.url;
   }
+
+  // Position the overlay
+  this.positionOverlay(markerId, marker);
+
+  // Start the animation interval
+  const frameInterval = 1000 / (animation.metadata.frameRate || 2);
+  const intervalId = setInterval(() => {
+    this.updateOverlayFrame(markerId);
+  }, frameInterval);
+
+  this.animationIntervals.set(markerId, intervalId);
+}
+
+updateOverlayFrame(markerId) {
+  const animState = this.activeOverlays.get(markerId);
+  if (!animState) return;
+
+  // Increment to next frame (this will cycle: 0 -> 1 -> 2 -> 0...)
+  animState.currentFrame = (animState.currentFrame + 1) % animState.animation.frames.length;
+  
+  const currentFrame = animState.animation.frames[animState.currentFrame];
+  if (currentFrame && currentFrame.url) {
+    animState.img.src = currentFrame.url;
+  }
+}
 
   updateOverlayFrame(markerId) {
     const animState = this.activeOverlays.get(markerId);
