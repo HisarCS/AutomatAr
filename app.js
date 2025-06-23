@@ -2011,8 +2011,8 @@ class ARManager {
   overlay.className = 'ar-animation-overlay';
   overlay.style.cssText = `
     position: absolute;
-    width: 50px;
-    height: 50px;
+    width: 200px;
+    height: 200px;
     border-radius: 8px;
     overflow: hidden;
     display: none;
@@ -2021,8 +2021,8 @@ class ARManager {
 
   const img = document.createElement('img');
   img.style.cssText = `
-    width: 50%;
-    height: 50%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     border-radius: 6px;
   `;
