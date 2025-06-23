@@ -2011,8 +2011,8 @@ class ARManager {
   overlay.className = 'ar-animation-overlay';
   overlay.style.cssText = `
     position: absolute;
-    width: 200px;
-    height: 200px;
+    width: 100px;
+    height: 100px;
     border-radius: 8px;
     overflow: hidden;
     display: none;
