@@ -2021,8 +2021,8 @@ class ARManager {
 
   const img = document.createElement('img');
   img.style.cssText = `
-    width: 100%;
-    height: 100%;
+    width: 50%;
+    height: 50%;
     object-fit: cover;
     border-radius: 6px;
   `;
