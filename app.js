@@ -1598,10 +1598,6 @@ class CreateManager {
  * AR MANAGER WITH ANIMATION INTEGRATION
  ********************************************/
 
-/********************************************
- * COMPLETE AR MANAGER WITH ANIMATION SELECTION
- ********************************************/
-
 class ARManager {
   constructor() {
     // Core AR components
@@ -1629,22 +1625,10 @@ class ARManager {
     this.activeOverlays = new Map();
     this.animationIntervals = new Map();
     
-    // Animation Library Cache
+    // Animation Library Cache - NEW
     this.animationLibrary = new Map();
     this.animationsLoaded = false;
     this.loadingAnimations = false;
-    
-    // Animation Selection System
-    this.markerAnimationPreferences = new Map();
-    this.animationsByMarker = new Map();
-    this.selectorMenu = null;
-    this.isMenuVisible = false;
-    this.currentMarkerForSelection = null;
-    this.settingsButton = null;
-    
-    // Currently detected markers tracking
-    this.currentlyDetectedMarkers = new Map(); // markerId -> marker object
-    this.markersWithMultipleAnimations = new Map(); // markerId -> animations array
   }
 
   async init() {
@@ -1657,24 +1641,177 @@ class ARManager {
       this.initRenderer();
       this.initSTLLoader();
       this.initOverlaySystem();
-      this.initAnimationSelector();
       
-      // Load animations from cloud
+      // Load animations from cloud - NEW
       await this.loadAnimationsFromCloud();
       
       this.startRenderLoop();
       
       this.isInitialized = true;
-      Utils.log('Complete ARManager with Animation Selection initialized successfully', 'success');
+      Utils.log('ARManager with Animation System initialized successfully', 'success');
     } catch (error) {
       Utils.log(`AR initialization failed: ${error.message}`, 'error');
       throw error;
     }
   }
 
-  /********************************************
-   * CORE AR INITIALIZATION METHODS
-   ********************************************/
+  // NEW: Load animations from Supabase
+  async loadAnimationsFromCloud() {
+    if (this.animationsLoaded || this.loadingAnimations) {
+      console.log('⏭️ Animations already loaded or loading...');
+      return;
+    }
+
+    this.loadingAnimations = true;
+    Utils.log('Loading animations from cloud for AR...', 'info');
+
+    try {
+      // Get CreateManager instance
+      const createManager = this.getCreateManager();
+      
+      if (!createManager || !createManager.supabase) {
+        Utils.log('CreateManager or Supabase not available, skipping animation loading', 'warning');
+        this.loadingAnimations = false;
+        return;
+      }
+
+      // Load animations from Supabase
+      const animations = await createManager.loadAnimations();
+      
+      if (!animations || animations.length === 0) {
+        Utils.log('No animations found in cloud', 'info');
+        this.animationsLoaded = true;
+        this.loadingAnimations = false;
+        return;
+      }
+      
+      // Clear existing cache
+      this.animationLibrary.clear();
+      
+      // Process and cache animations
+      let successCount = 0;
+      for (const animation of animations) {
+        try {
+          if (animation.marker_tags && animation.marker_tags.length > 0) {
+            const processedAnimation = this.processAnimationData(animation);
+            this.animationLibrary.set(animation.id, processedAnimation);
+            
+            Utils.log(`Cached animation "${animation.name}" with markers: ${animation.marker_tags.join(', ')}`, 'success');
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to process animation "${animation.name}":`, error);
+        }
+      }
+      
+      this.animationsLoaded = true;
+      Utils.log(`Loaded ${successCount}/${animations.length} animations for AR`, 'success');
+      
+    } catch (error) {
+      Utils.log(`Failed to load animations: ${error.message}`, 'error');
+    } finally {
+      this.loadingAnimations = false;
+    }
+  }
+
+  // NEW: Process animation data from Supabase format
+  processAnimationData(animation) {
+    const frames = [];
+    
+    if (animation.frame_urls && Array.isArray(animation.frame_urls)) {
+      frames.push(...animation.frame_urls.map(frameData => ({
+        url: frameData.url,
+        cellIndex: frameData.cell_index || 0,
+        timestamp: frameData.timestamp || Date.now(),
+        markers: frameData.markers || []
+      })));
+    }
+    
+    return {
+      id: animation.id,
+      name: animation.name,
+      frames: frames,
+      tags: animation.marker_tags, // Array of marker IDs
+      metadata: {
+        frameCount: animation.frame_count,
+        frameRate: animation.frame_rate || 2,
+        createdAt: animation.created_at,
+        ...animation.metadata
+      }
+    };
+  }
+
+  // NEW: Get CreateManager instance
+  getCreateManager() {
+    if (window.AppState && window.AppState.createManager) {
+      return window.AppState.createManager;
+    }
+    if (window.App && window.App.createManager) {
+      return window.App.createManager;
+    }
+    if (window.createManager) {
+      return window.createManager;
+    }
+    return null;
+  }
+
+  // NEW: Direct marker-to-model mapping (bypasses complex scenario system)
+  getDirectModelForMarker(markerId) {
+    // Direct mapping of marker IDs to 3D models
+    const directModelMap = {
+      0: "sea_models/stringray.stl",
+      1: "sea_models/jellyfish.stl", 
+      2: "sea_models/dolphin.stl",
+      3: "sea_models/octopus.stl",
+      4: "sea_models/fishes.stl",
+      5: "sea_models/sea_turtle.stl",
+      6: "sea_models/stringray.stl",
+      7: "octopus_exotic_tropic_0409194610_texture.stl",
+      8: "coral_reef_fish_uniqu_0409193350_texture.stl", 
+      9: "marine_animal_exotic__0409191724_texture.stl",
+      10: "jellyfish_exotic_trop_0409193559_texture.stl",
+      11: "sea_models/sea_turtle.stl",
+      15: "octopus_baby_exotic_t_0409195159_texture.stl",
+      31: "fish_tropical_0409190013_texture.stl"
+    };
+    
+    return directModelMap[markerId] || null;
+  }
+
+  // NEW: Refresh animation cache
+  async refreshAnimations() {
+    Utils.log('Refreshing animation cache...', 'info');
+    this.animationsLoaded = false;
+    this.animationLibrary.clear();
+    
+    // Stop all active animations
+    this.animationIntervals.forEach(intervalId => clearInterval(intervalId));
+    this.animationIntervals.clear();
+    this.activeOverlays.forEach(animState => animState.element.remove());
+    this.activeOverlays.clear();
+    
+    await this.loadAnimationsFromCloud();
+  }
+
+  initOverlaySystem() {
+    this.overlayContainer = document.createElement('div');
+    this.overlayContainer.id = 'arAnimationOverlay';
+    this.overlayContainer.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 15;
+    `;
+    
+    const threeContainer = Utils.$('threeContainer');
+    if (threeContainer) {
+      threeContainer.appendChild(this.overlayContainer);
+      Utils.log('2D Animation Overlay System initialized', 'success');
+    }
+  }
 
   initElements() {
     this.video = Utils.$('video');
@@ -1799,935 +1936,71 @@ class ARManager {
     this.stlLoader = new THREE.STLLoader();
   }
 
-  initOverlaySystem() {
-    this.overlayContainer = document.createElement('div');
-    this.overlayContainer.id = 'arAnimationOverlay';
-    this.overlayContainer.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 15;
-    `;
-    
-    const threeContainer = Utils.$('threeContainer');
-    if (threeContainer) {
-      threeContainer.appendChild(this.overlayContainer);
-      Utils.log('2D Animation Overlay System initialized', 'success');
-    }
-  }
-
-  /********************************************
-   * ANIMATION SELECTION SYSTEM
-   ********************************************/
-
-  initAnimationSelector() {
-    this.createSelectorMenu();
-    this.createSettingsButton();
-    this.loadUserPreferences();
-    Utils.log('Animation Selection System initialized', 'success');
-  }
-
-  createSelectorMenu() {
-    this.selectorMenu = document.createElement('div');
-    this.selectorMenu.id = 'animationSelectorMenu';
-    this.selectorMenu.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(145deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
-      border: 2px solid #FF8C00;
-      border-radius: 16px;
-      padding: 1.5rem;
-      z-index: 3000;
-      display: none;
-      color: white;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 140, 0, 0.3);
-      backdrop-filter: blur(10px);
-      max-width: 500px;
-      max-height: 70vh;
-      overflow-y: auto;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-
-    const header = document.createElement('div');
-    header.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid rgba(255, 140, 0, 0.3);
-    `;
-
-    header.innerHTML = `
-      <h3 style="margin: 0; color: #FF8C00; font-size: 1.3rem; font-weight: 600;">Choose Animation</h3>
-      <button onclick="window.App.arManager.hideAnimationMenu()" 
-              style="background: rgba(255, 140, 0, 0.2); border: 1px solid #FF8C00; color: #FF8C00; 
-                     width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; 
-                     transition: all 0.3s ease;" 
-              onmouseover="this.style.background='#FF8C00'; this.style.color='white';"
-              onmouseout="this.style.background='rgba(255, 140, 0, 0.2)'; this.style.color='#FF8C00';">×</button>
-    `;
-
-    const subtitle = document.createElement('p');
-    subtitle.id = 'animationSelectorSubtitle';
-    subtitle.style.cssText = `
-      margin: 0.5rem 0 0 0;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.9rem;
-      line-height: 1.4;
-    `;
-
-    const content = document.createElement('div');
-    content.id = 'animationSelectorContent';
-    content.style.cssText = `
-      display: grid;
-      gap: 0.8rem;
-      margin-top: 1rem;
-    `;
-
-    this.selectorMenu.appendChild(header);
-    this.selectorMenu.appendChild(subtitle);
-    this.selectorMenu.appendChild(content);
-
-    const arScreen = document.getElementById('arScreen');
-    if (arScreen) {
-      arScreen.appendChild(this.selectorMenu);
-    }
-
-    // Close menu when clicking outside
-    this.selectorMenu.onclick = (e) => {
-      if (e.target === this.selectorMenu) {
-        this.hideAnimationMenu();
-      }
+  startRenderLoop() {
+    const render = () => {
+      requestAnimationFrame(render);
+      this.tick();
     };
+    render();
   }
 
-  createSettingsButton() {
-    this.settingsButton = document.createElement('button');
-    this.settingsButton.innerHTML = '⚙️';
-    this.settingsButton.title = 'Animation Preferences';
-    this.settingsButton.style.cssText = `
-      background: rgba(156, 39, 176, 0.9);
-      color: white;
-      border: 2px solid #9C27B0;
-      width: 100%;
-      height: 50px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1.2rem;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
-      margin-bottom: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      text-transform: uppercase;
-      font-weight: 700;
-    `;
-
-    this.settingsButton.onmouseover = () => {
-      this.settingsButton.style.transform = 'translateY(-2px)';
-      this.settingsButton.style.background = '#9C27B0';
-      this.settingsButton.style.boxShadow = '0 6px 18px rgba(156, 39, 176, 0.4)';
-    };
-
-    this.settingsButton.onmouseout = () => {
-      this.settingsButton.style.transform = 'translateY(0)';
-      this.settingsButton.style.background = 'rgba(156, 39, 176, 0.9)';
-      this.settingsButton.style.boxShadow = '0 4px 12px rgba(156, 39, 176, 0.3)';
-    };
-
-    this.settingsButton.onclick = () => this.handleSettingsButtonClick();
-
-    // Add text to the button
-    const buttonText = document.createElement('span');
-    buttonText.textContent = 'Animation Settings';
-    buttonText.style.fontSize = '0.8rem';
-    buttonText.style.fontWeight = '700';
-    
-    this.settingsButton.appendChild(buttonText);
-
-    // Find the AR sidebar and add the button before the debug button
-    const arSidebar = document.querySelector('.ar-sidebar');
-    const debugButton = document.getElementById('debugSideBtn');
-    
-    if (arSidebar && debugButton) {
-      // Insert the animation settings button before the debug button
-      arSidebar.insertBefore(this.settingsButton, debugButton);
-    } else if (arSidebar) {
-      // If no debug button found, add to end of sidebar
-      arSidebar.appendChild(this.settingsButton);
-    } else {
-      // Fallback: add to AR screen
-      const arScreen = document.getElementById('arScreen');
-      if (arScreen) {
-        arScreen.appendChild(this.settingsButton);
-      }
-    }
-  }
-
-  /********************************************
-   * ANIMATION LIBRARY MANAGEMENT
-   ********************************************/
-
-  async loadAnimationsFromCloud() {
-    if (this.animationsLoaded || this.loadingAnimations) {
-      console.log('⏭️ Animations already loaded or loading...');
-      return;
-    }
-
-    this.loadingAnimations = true;
-    Utils.log('Loading animations from cloud for AR...', 'info');
+  tick() {
+    if (this.video.readyState !== this.video.HAVE_ENOUGH_DATA) return;
 
     try {
-      const createManager = this.getCreateManager();
+      this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+      const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
       
-      if (!createManager || !createManager.supabase) {
-        Utils.log('CreateManager or Supabase not available, skipping animation loading', 'warning');
-        this.loadingAnimations = false;
-        return;
-      }
+      if (this.videoTexture) this.videoTexture.needsUpdate = true;
 
-      const animations = await createManager.loadAnimations();
-      
-      if (!animations || animations.length === 0) {
-        Utils.log('No animations found in cloud', 'info');
-        this.animationsLoaded = true;
-        this.loadingAnimations = false;
-        return;
-      }
-      
-      // Clear existing caches
-      this.animationLibrary.clear();
-      this.animationsByMarker.clear();
-      
-      // Process and cache animations
-      let successCount = 0;
-      for (const animation of animations) {
-        try {
-          if (animation.marker_tags && animation.marker_tags.length > 0) {
-            const processedAnimation = this.processAnimationData(animation);
-            this.animationLibrary.set(animation.id, processedAnimation);
-            
-            // Group animations by marker tags
-            animation.marker_tags.forEach(tag => {
-              const markerId = this.normalizeMarkerId(tag);
-              
-              if (!this.animationsByMarker.has(markerId)) {
-                this.animationsByMarker.set(markerId, []);
-              }
-              
-              this.animationsByMarker.get(markerId).push({
-                ...processedAnimation,
-                id: animation.id
-              });
-            });
-            
-            Utils.log(`Cached animation "${animation.name}" with markers: ${animation.marker_tags.join(', ')}`, 'success');
-            successCount++;
-          }
-        } catch (error) {
-          console.error(`Failed to process animation "${animation.name}":`, error);
-        }
-      }
-      
-      this.animationsLoaded = true;
-      Utils.log(`Loaded ${successCount}/${animations.length} animations for AR`, 'success');
-      Utils.log(`Grouped animations by ${this.animationsByMarker.size} unique markers`, 'info');
-      
+      const markers = this.detector.detect(imageData);
+
+      this.updateScene(markers);
+      this.updateAllAnimations();
+
+      this.renderer.autoClear = false;
+      this.renderer.clear();
+      this.renderer.render(this.backgroundScene, this.backgroundCamera);
+      this.renderer.render(this.scene, this.camera);
+
+      this.lastFrameMarkers = markers.slice();
+      this.updateDebugInfo(markers);
     } catch (error) {
-      Utils.log(`Failed to load animations: ${error.message}`, 'error');
-    } finally {
-      this.loadingAnimations = false;
+      Utils.log(`AR render error: ${error.message}`, 'error');
     }
   }
 
-  processAnimationData(animation) {
-    const frames = [];
-    
-    if (animation.frame_urls && Array.isArray(animation.frame_urls)) {
-      frames.push(...animation.frame_urls.map(frameData => ({
-        url: frameData.url,
-        cellIndex: frameData.cell_index || 0,
-        timestamp: frameData.timestamp || Date.now(),
-        markers: frameData.markers || []
-      })));
-    }
-    
-    return {
-      id: animation.id,
-      name: animation.name,
-      frames: frames,
-      tags: animation.marker_tags,
-      metadata: {
-        frameCount: animation.frame_count,
-        frameRate: animation.frame_rate || 2,
-        createdAt: animation.created_at,
-        ...animation.metadata
-      }
-    };
-  }
-
-  getCreateManager() {
-    if (window.AppState && window.AppState.createManager) {
-      return window.AppState.createManager;
-    }
-    if (window.App && window.App.createManager) {
-      return window.App.createManager;
-    }
-    if (window.createManager) {
-      return window.createManager;
-    }
-    return null;
-  }
-
-  normalizeMarkerId(markerId) {
-    if (typeof markerId === 'string') {
-      return parseInt(markerId, 10);
-    }
-    return markerId;
-  }
-
-  async refreshAnimations() {
-    Utils.log('Refreshing animation cache...', 'info');
-    this.animationsLoaded = false;
-    this.animationLibrary.clear();
-    this.animationsByMarker.clear();
-    
-    // Stop all active animations
-    this.animationIntervals.forEach(intervalId => clearInterval(intervalId));
-    this.animationIntervals.clear();
-    this.activeOverlays.forEach(animState => animState.element.remove());
-    this.activeOverlays.clear();
-    
-    await this.loadAnimationsFromCloud();
-  }
-
-  /********************************************
-   * ANIMATION SELECTION LOGIC
-   ********************************************/
-
+  // FIXED: Animation lookup using local cache
   getAnimationForMarker(markerId) {
     try {
-      const normalizedId = this.normalizeMarkerId(markerId);
-      const animations = this.animationsByMarker.get(normalizedId);
-
-      if (!animations || animations.length === 0) {
-        // Remove from multiple animations tracking if it was there
-        this.markersWithMultipleAnimations.delete(normalizedId);
+      // Use local animation cache instead of non-existent property
+      if (!this.animationLibrary || this.animationLibrary.size === 0) {
         return null;
       }
-
-      if (animations.length === 1) {
-        // Only one animation available - use it directly
-        this.markersWithMultipleAnimations.delete(normalizedId);
-        return animations[0];
-      }
-
-      // Multiple animations available - track this marker but don't show menu automatically
-      this.markersWithMultipleAnimations.set(normalizedId, animations);
-
-      // Check user preference
-      const preferredAnimationId = this.markerAnimationPreferences.get(normalizedId);
       
-      if (preferredAnimationId) {
-        const preferredAnimation = animations.find(anim => anim.id === preferredAnimationId);
-        if (preferredAnimation) {
-          return preferredAnimation;
+      // Search through cached animations for matching tags
+      for (let [animId, animation] of this.animationLibrary) {
+        if (animation.tags && Array.isArray(animation.tags)) {
+          const hasMatch = animation.tags.some(tag => {
+            return tag === markerId || 
+                   tag === String(markerId) || 
+                   Number(tag) === markerId ||
+                   parseInt(tag) === parseInt(markerId);
+          });
+          
+          if (hasMatch) {
+            Utils.log(`Found cached animation "${animation.name}" for marker ${markerId}`, 'success');
+            return animation;
+          }
         }
       }
-
-      // No preference set - return first animation as default (menu will only show when button pressed)
-      return animations[0];
       
+      return null;
     } catch (error) {
       Utils.log(`Error getting animation for marker ${markerId}: ${error.message}`, 'error');
       return null;
     }
   }
-
-  showAnimationSelectionMenu(markerId, animations) {
-    // Only show selection menu if there are multiple animations
-    if (!animations || animations.length <= 1) {
-      return;
-    }
-
-    if (this.isMenuVisible && this.currentMarkerForSelection === markerId) {
-      return; // Menu already open for this marker
-    }
-
-    this.currentMarkerForSelection = markerId;
-    this.isMenuVisible = true;
-
-    // Update subtitle
-    const subtitle = document.getElementById('animationSelectorSubtitle');
-    if (subtitle) {
-      subtitle.textContent = `Multiple animations available for Marker ID: ${markerId}. Select your preferred animation (menu stays open for easy switching):`;
-    }
-
-    // Determine which animation is currently selected
-    const currentPreference = this.markerAnimationPreferences.get(markerId);
-    let currentlySelectedAnimation = null;
-    
-    if (currentPreference) {
-      currentlySelectedAnimation = animations.find(anim => anim.id === currentPreference);
-    }
-    
-    // If no preference or preference not found, default to first animation
-    if (!currentlySelectedAnimation) {
-      currentlySelectedAnimation = animations[0];
-    }
-
-    // Clear and populate content
-    const content = document.getElementById('animationSelectorContent');
-    content.innerHTML = '';
-
-    animations.forEach((animation) => {
-      const isCurrentlySelected = animation.id === currentlySelectedAnimation.id;
-      const optionCard = this.createAnimationOptionCard(animation, markerId, isCurrentlySelected);
-      content.appendChild(optionCard);
-    });
-
-    // Show menu with animation
-    this.selectorMenu.style.display = 'block';
-    this.selectorMenu.style.opacity = '0';
-    this.selectorMenu.style.transform = 'translate(-50%, -50%) scale(0.8)';
-    this.selectorMenu.style.transition = 'all 0.3s ease';
-    
-    setTimeout(() => {
-      this.selectorMenu.style.opacity = '1';
-      this.selectorMenu.style.transform = 'translate(-50%, -50%) scale(1)';
-    }, 10);
-
-    Utils.log(`Showing animation selection menu for marker ${markerId} with ${animations.length} options, currently selected: ${currentlySelectedAnimation.name}`, 'info');
-  }
-
-  showNoAnimationsMessage(markerId) {
-    // Create temporary "no animations" notification
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 69, 0, 0.9);
-      color: white;
-      padding: 1rem 2rem;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      z-index: 2500;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-      opacity: 0;
-      transition: all 0.3s ease;
-    `;
-    
-    notification.textContent = `No animations available for Marker ID: ${markerId}`;
-    
-    const arScreen = document.getElementById('arScreen');
-    if (arScreen) {
-      arScreen.appendChild(notification);
-    } else {
-      document.body.appendChild(notification);
-    }
-    
-    // Show with animation
-    setTimeout(() => {
-      notification.style.opacity = '1';
-      notification.style.transform = 'translateX(-50%) translateY(10px)';
-    }, 10);
-    
-    // Auto-hide after 2 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transform = 'translateX(-50%) translateY(-10px)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 2000);
-
-    Utils.log(`No animations found for marker ${markerId}`, 'info');
-  }
-
-  createAnimationOptionCard(animation, markerId, isSelected = false) {
-    const card = document.createElement('div');
-    card.className = 'animation-option-card';
-    card.style.cssText = `
-      background: ${isSelected ? 'rgba(255, 140, 0, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
-      border: 2px solid ${isSelected ? '#FF8C00' : 'rgba(255, 255, 255, 0.1)'};
-      border-radius: 12px;
-      padding: 1rem;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-    `;
-
-    card.onmouseover = () => {
-      if (!card.classList.contains('selected')) {
-        card.style.background = 'rgba(255, 140, 0, 0.1)';
-        card.style.borderColor = 'rgba(255, 140, 0, 0.5)';
-      }
-    };
-
-    card.onmouseout = () => {
-      if (!card.classList.contains('selected')) {
-        card.style.background = 'rgba(255, 255, 255, 0.05)';
-        card.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-      }
-    };
-
-    // Preview image container with selection button in TOP-LEFT corner
-    const preview = document.createElement('div');
-    preview.className = 'animation-preview';
-    preview.style.cssText = `
-      width: 80px; height: 60px; background: rgba(0, 0, 0, 0.3); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
-      position: relative;
-    `;
-
-    // Selection button positioned in TOP-LEFT corner of preview (camera view)
-    const selectionButton = document.createElement('div');
-    selectionButton.className = 'selection-indicator';
-    selectionButton.style.cssText = `
-      position: absolute;
-      top: 4px;
-      left: 4px;
-      width: 20px;
-      height: 20px;
-      border: 3px solid ${isSelected ? '#FF8C00' : 'rgba(255, 140, 0, 0.8)'};
-      border-radius: 50%;
-      background: ${isSelected ? '#FF8C00' : 'transparent'};
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-      z-index: 10;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
-      cursor: pointer;
-    `;
-
-    if (isSelected) {
-      const checkmark = document.createElement('div');
-      checkmark.style.cssText = `
-        width: 8px;
-        height: 8px;
-        background: white;
-        border-radius: 50%;
-      `;
-      selectionButton.appendChild(checkmark);
-      card.classList.add('selected');
-    }
-
-    if (animation.frames && animation.frames.length > 0 && animation.frames[0].url) {
-      const img = document.createElement('img');
-      img.src = animation.frames[0].url;
-      img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; border-radius: 6px;';
-      img.onerror = () => {
-        preview.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">No Preview</span>';
-        preview.appendChild(selectionButton); // Re-add button after error
-      };
-      preview.appendChild(img);
-    } else {
-      preview.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">No Preview</span>';
-    }
-
-    // Add selection button to TOP-LEFT of preview
-    preview.appendChild(selectionButton);
-
-    // Animation info
-    const info = document.createElement('div');
-    info.style.cssText = 'flex: 1; min-width: 0;';
-
-    const name = document.createElement('div');
-    name.textContent = animation.name || 'Unnamed Animation';
-    name.style.cssText = 'font-weight: 600; color: white; margin-bottom: 0.3rem; font-size: 1rem;';
-
-    const details = document.createElement('div');
-    details.style.cssText = 'color: rgba(255, 255, 255, 0.7); font-size: 0.85rem; line-height: 1.3;';
-
-    const frameCount = animation.frames ? animation.frames.length : 0;
-    const frameRate = animation.metadata?.frameRate || 2;
-    const createdAt = animation.metadata?.createdAt ? 
-      new Date(animation.metadata.createdAt).toLocaleDateString() : 'Unknown';
-
-    details.innerHTML = `${frameCount} frames • ${frameRate.toFixed(1)} FPS<br>
-      <span style="font-size: 0.75rem; opacity: 0.8;">Created: ${createdAt}</span>`;
-
-    info.appendChild(name);
-    info.appendChild(details);
-    
-    card.appendChild(preview);
-    card.appendChild(info);
-
-    card.onclick = () => this.selectAnimation(markerId, animation.id, card);
-
-    return card;
-  }
-
-  selectAnimation(markerId, animationId, selectedCard) {
-    // Update preference
-    this.markerAnimationPreferences.set(markerId, animationId);
-    this.saveUserPreferences();
-
-    // Update UI to show new selection
-    const content = document.getElementById('animationSelectorContent');
-    const cards = content.querySelectorAll('.animation-option-card');
-    
-    cards.forEach(card => {
-      // Find the indicator (positioned absolutely in the preview container)
-      const preview = card.querySelector('.animation-preview');
-      const indicator = preview ? preview.querySelector('.selection-indicator') : null;
-      
-      if (card === selectedCard) {
-        // Selected card styling
-        card.style.background = 'rgba(255, 140, 0, 0.2)';
-        card.style.borderColor = '#FF8C00';
-        card.classList.add('selected');
-        
-        // Update indicator for selected state
-        if (indicator) {
-          indicator.style.borderColor = '#FF8C00';
-          indicator.style.background = '#FF8C00';
-          indicator.innerHTML = '<div style="width: 6px; height: 6px; background: white; border-radius: 50%;"></div>';
-        }
-      } else {
-        // Unselected card styling
-        card.style.background = 'rgba(255, 255, 255, 0.05)';
-        card.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-        card.classList.remove('selected');
-        
-        // Update indicator for unselected state
-        if (indicator) {
-          indicator.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-          indicator.style.background = 'transparent';
-          indicator.innerHTML = '';
-        }
-      }
-    });
-
-    // Get animation name for feedback
-    const animations = this.animationsByMarker.get(markerId);
-    const selectedAnimation = animations.find(anim => anim.id === animationId);
-    const animationName = selectedAnimation ? selectedAnimation.name : 'animation';
-
-    Utils.log(`Selected animation ${animationId} for marker ${markerId}`, 'success');
-
-    // Show brief feedback that the selection changed
-    this.showSelectionFeedback(markerId, animationName);
-
-    // Immediately refresh the animation without closing the menu
-    this.stop2DAnimation(markerId);
-    
-    // The new animation will start on the next frame when the marker is detected again
-    // Menu stays open for further selections if needed
-  }
-
-  showSelectionFeedback(markerId, animationName) {
-    // Create brief feedback notification
-    const feedback = document.createElement('div');
-    feedback.style.cssText = `
-      position: fixed;
-      top: 15%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(76, 175, 80, 0.9);
-      color: white;
-      padding: 0.8rem 1.5rem;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      z-index: 3500;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(5px);
-      opacity: 0;
-      transition: all 0.3s ease;
-    `;
-    
-    feedback.textContent = `✓ Now playing: ${animationName}`;
-    
-    const arScreen = document.getElementById('arScreen');
-    if (arScreen) {
-      arScreen.appendChild(feedback);
-    } else {
-      document.body.appendChild(feedback);
-    }
-    
-    // Show with animation
-    setTimeout(() => {
-      feedback.style.opacity = '1';
-      feedback.style.transform = 'translateX(-50%) translateY(5px)';
-    }, 10);
-    
-    // Auto-hide after 1.5 seconds
-    setTimeout(() => {
-      feedback.style.opacity = '0';
-      feedback.style.transform = 'translateX(-50%) translateY(-5px)';
-      setTimeout(() => {
-        if (feedback.parentNode) {
-          feedback.parentNode.removeChild(feedback);
-        }
-      }, 300);
-    }, 1500);
-  }
-
-  hideAnimationMenu() {
-    if (!this.isMenuVisible) return;
-
-    this.selectorMenu.style.opacity = '0';
-    this.selectorMenu.style.transform = 'translate(-50%, -50%) scale(0.8)';
-    
-    setTimeout(() => {
-      this.selectorMenu.style.display = 'none';
-      this.isMenuVisible = false;
-      this.currentMarkerForSelection = null;
-    }, 300);
-  }
-
-  handleSettingsButtonClick() {
-    // Check for currently detected markers with multiple animations
-    const markersWithMultiple = Array.from(this.markersWithMultipleAnimations.keys());
-    
-    if (markersWithMultiple.length === 0) {
-      // No markers with multiple animations detected
-      this.showNoMultipleAnimationsMessage();
-      return;
-    }
-    
-    if (markersWithMultiple.length === 1) {
-      // Only one marker with multiple animations - show selection menu directly
-      const markerId = markersWithMultiple[0];
-      const animations = this.markersWithMultipleAnimations.get(markerId);
-      this.showAnimationSelectionMenu(markerId, animations);
-      return;
-    }
-    
-    // Multiple markers with multiple animations - show marker selection menu
-    this.showMarkerSelectionMenu(markersWithMultiple);
-  }
-
-  showNoMultipleAnimationsMessage() {
-    let message = 'No markers with multiple animations detected.';
-    
-    if (this.currentlyDetectedMarkers.size === 0) {
-      message = 'No markers detected. Point camera at a marker first.';
-    } else {
-      const detectedIds = Array.from(this.currentlyDetectedMarkers.keys());
-      message = `Detected markers (${detectedIds.join(', ')}) don't have multiple animations available.`;
-    }
-    
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 152, 0, 0.9);
-      color: white;
-      padding: 1.2rem 2rem;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      z-index: 3500;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-      opacity: 0;
-      transition: all 0.3s ease;
-      max-width: 400px;
-      text-align: center;
-    `;
-    
-    notification.textContent = message;
-    
-    const arScreen = document.getElementById('arScreen');
-    if (arScreen) {
-      arScreen.appendChild(notification);
-    } else {
-      document.body.appendChild(notification);
-    }
-    
-    // Show with animation
-    setTimeout(() => {
-      notification.style.opacity = '1';
-      notification.style.transform = 'translateX(-50%) translateY(10px)';
-    }, 10);
-    
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-      notification.style.opacity = '0';
-      notification.style.transform = 'translateX(-50%) translateY(-10px)';
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.parentNode.removeChild(notification);
-        }
-      }, 300);
-    }, 3000);
-  }
-
-  showMarkerSelectionMenu(markerIds) {
-    const existingMenu = document.getElementById('markerSelectionMenu');
-    if (existingMenu) {
-      existingMenu.remove();
-    }
-
-    const markerMenu = document.createElement('div');
-    markerMenu.id = 'markerSelectionMenu';
-    markerMenu.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(145deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 20, 0.95));
-      border: 2px solid #FF8C00;
-      border-radius: 16px;
-      padding: 2rem;
-      z-index: 3000;
-      color: white;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 140, 0, 0.3);
-      backdrop-filter: blur(10px);
-      max-width: 500px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-
-    const header = document.createElement('div');
-    header.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <h3 style="margin: 0; color: #FF8C00; font-size: 1.4rem;">Choose Marker</h3>
-        <button onclick="document.getElementById('markerSelectionMenu').remove()" 
-                style="background: rgba(255, 140, 0, 0.2); border: 1px solid #FF8C00; color: #FF8C00; 
-                       width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">×</button>
-      </div>
-      <p style="margin: 0 0 1.5rem 0; color: rgba(255, 255, 255, 0.8); line-height: 1.4;">
-        Multiple markers with animation choices detected. Select which marker to configure:
-      </p>
-    `;
-
-    const content = document.createElement('div');
-    content.style.cssText = 'display: grid; gap: 1rem;';
-
-    markerIds.forEach(markerId => {
-      const animations = this.markersWithMultipleAnimations.get(markerId);
-      const selectedAnimationId = this.markerAnimationPreferences.get(markerId);
-      const selectedAnimation = selectedAnimationId ? 
-        animations.find(a => a.id === selectedAnimationId) : animations[0];
-
-      const markerCard = document.createElement('div');
-      markerCard.style.cssText = `
-        background: rgba(255, 140, 0, 0.1);
-        border: 2px solid rgba(255, 140, 0, 0.3);
-        border-radius: 12px;
-        padding: 1rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      `;
-
-      markerCard.onmouseover = () => {
-        markerCard.style.background = 'rgba(255, 140, 0, 0.2)';
-        markerCard.style.borderColor = '#FF8C00';
-      };
-
-      markerCard.onmouseout = () => {
-        markerCard.style.background = 'rgba(255, 140, 0, 0.1)';
-        markerCard.style.borderColor = 'rgba(255, 140, 0, 0.3)';
-      };
-
-      markerCard.innerHTML = `
-        <div>
-          <div style="color: white; font-weight: 600; margin-bottom: 0.3rem;">Marker ID: ${markerId}</div>
-          <div style="color: rgba(255, 255, 255, 0.7); font-size: 0.9rem;">
-            Current: ${selectedAnimation.name} (${animations.length} available)
-          </div>
-        </div>
-        <div style="color: #FF8C00; font-size: 1.2rem;">→</div>
-      `;
-
-      markerCard.onclick = () => {
-        document.getElementById('markerSelectionMenu').remove();
-        this.showAnimationSelectionMenu(markerId, animations);
-      };
-
-      content.appendChild(markerCard);
-    });
-
-    markerMenu.appendChild(header);
-    markerMenu.appendChild(content);
-    document.body.appendChild(markerMenu);
-
-    markerMenu.onclick = (e) => {
-      if (e.target === markerMenu) markerMenu.remove();
-    };
-  }
-
-  resetMarkerPreference(markerId) {
-    // Remove current preference to trigger selection menu on next scan
-    this.markerAnimationPreferences.delete(markerId);
-    this.saveUserPreferences();
-    
-    // Close settings menu
-    const settingsMenu = document.getElementById('animationSettingsMenu');
-    if (settingsMenu) {
-      settingsMenu.remove();
-    }
-    
-    // Stop current animation and show selection menu if animations exist
-    this.stop2DAnimation(markerId);
-    const animations = this.animationsByMarker.get(markerId);
-    if (animations && animations.length > 1) {
-      // Show selection menu immediately
-      setTimeout(() => {
-        this.showAnimationSelectionMenu(markerId, animations);
-      }, 300);
-    }
-    
-    Utils.log(`Reset animation preference for marker ${markerId} - selection menu will appear on next scan`, 'info');
-  }
-
-  saveUserPreferences() {
-    try {
-      const preferences = {};
-      this.markerAnimationPreferences.forEach((animationId, markerId) => {
-        preferences[markerId] = animationId;
-      });
-      localStorage.setItem('automatAR_animationPreferences', JSON.stringify(preferences));
-    } catch (error) {
-      Utils.log('Failed to save user preferences', 'warning');
-    }
-  }
-
-  loadUserPreferences() {
-    try {
-      const saved = localStorage.getItem('automatAR_animationPreferences');
-      if (saved) {
-        const preferences = JSON.parse(saved);
-        Object.entries(preferences).forEach(([markerId, animationId]) => {
-          this.markerAnimationPreferences.set(parseInt(markerId), animationId);
-        });
-        Utils.log(`Loaded ${Object.keys(preferences).length} animation preferences`, 'info');
-      }
-    } catch (error) {
-      Utils.log('Failed to load user preferences', 'warning');
-    }
-  }
-
-  /********************************************
-   * 2D ANIMATION OVERLAY SYSTEM
-   ********************************************/
 
   start2DAnimation(markerId, animation, marker) {
     this.stop2DAnimation(markerId);
@@ -2738,8 +2011,8 @@ class ARManager {
     overlay.className = 'ar-animation-overlay';
     overlay.style.cssText = `
       position: absolute;
-      width: 50px;
-      height: 50px;
+      width: 200px;
+      height: 200px;
       border-radius: 8px;
       overflow: hidden;
       display: none;
@@ -2798,22 +2071,6 @@ class ARManager {
       const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
       const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
 
-      // Calculate rotation angle from marker corners
-      // Use the vector from corner 0 to corner 1 to determine rotation
-      const corner0 = marker.corners[0];
-      const corner1 = marker.corners[1];
-      
-      const deltaX = corner1.x - corner0.x;
-      const deltaY = corner1.y - corner0.y;
-      
-      // Calculate angle in radians, then convert to degrees
-      let rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
-      
-      // Normalize angle to 0-360 range
-      if (rotationAngle < 0) {
-        rotationAngle += 360;
-      }
-
       const container = Utils.$('threeContainer');
       if (!container) return;
 
@@ -2824,11 +2081,8 @@ class ARManager {
       const screenX = centerX * scaleX;
       const screenY = centerY * scaleY;
 
-      // Apply position and rotation transform
       animState.element.style.left = (screenX - 100) + 'px';
       animState.element.style.top = (screenY - 100) + 'px';
-      animState.element.style.transform = `rotate(${rotationAngle}deg)`;
-      animState.element.style.transformOrigin = 'center center';
       animState.element.style.display = 'block';
       
     } catch (error) {
@@ -2850,137 +2104,6 @@ class ARManager {
     }
   }
 
-  updateAllAnimations() {
-    this.activeOverlays.forEach((animState, markerId) => {
-      if (animState.marker) {
-        this.positionOverlay(markerId, animState.marker);
-      }
-    });
-  }
-
-  /********************************************
-   * 3D MODEL SYSTEM
-   ********************************************/
-
-  getDirectModelForMarker(markerId) {
-    // Direct mapping of marker IDs to 3D models
-    const directModelMap = {
-      0: "sea_models/stringray.stl",
-      1: "sea_models/jellyfish.stl", 
-      2: "sea_models/dolphin.stl",
-      3: "sea_models/octopus.stl",
-      4: "sea_models/fishes.stl",
-      5: "sea_models/sea_turtle.stl",
-      6: "sea_models/stringray.stl",
-      7: "octopus_exotic_tropic_0409194610_texture.stl",
-      8: "coral_reef_fish_uniqu_0409193350_texture.stl", 
-      9: "marine_animal_exotic__0409191724_texture.stl",
-      10: "jellyfish_exotic_trop_0409193559_texture.stl",
-      11: "sea_models/sea_turtle.stl",
-      15: "octopus_baby_exotic_t_0409195159_texture.stl",
-      31: "fish_tropical_0409190013_texture.stl"
-    };
-    
-    return directModelMap[markerId] || null;
-  }
-
-  placeObject(marker, stlRelativePath) {
-    if (!this.stlLoader) return;
-
-    const stlFullPath = `models/${stlRelativePath}`;
-    
-    const corners = marker.corners.map(corner => ({
-      x: corner.x - (this.canvas.width / 2),
-      y: (this.canvas.height / 2) - corner.y
-    }));
-
-    const pose = this.posit.pose(corners);
-
-    this.loadSTL(stlFullPath, (geometry) => {
-      geometry.computeBoundingBox();
-      const min = geometry.boundingBox.min;
-      const max = geometry.boundingBox.max;
-      const center = new THREE.Vector3().addVectors(min, max).multiplyScalar(0.5);
-      const offset = center.clone().multiplyScalar(-1);
-
-      if (geometry.isBufferGeometry) {
-        geometry.translate(offset.x, offset.y, offset.z);
-      } else {
-        const mat = new THREE.Matrix4().makeTranslation(offset.x, offset.y, offset.z);
-        geometry.applyMatrix(mat);
-      }
-
-      const material = new THREE.MeshPhongMaterial({ color: 0xD4A574 });
-      const mesh = new THREE.Mesh(geometry, material);
-
-      const scaleFactor = 0.05 * this.modelSize * 0.02;
-      mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-      const r = pose.bestRotation;
-      mesh.rotation.x = -Math.asin(-r[1][2]);
-      mesh.rotation.y = -Math.atan2(r[0][2], r[2][2]);
-      mesh.rotation.z = Math.atan2(r[1][0], r[1][1]);
-
-      mesh.position.x = pose.bestTranslation[0];
-      mesh.position.y = pose.bestTranslation[1];
-      mesh.position.z = -pose.bestTranslation[2];
-
-      this.scene.add(mesh);
-    });
-  }
-
-  loadSTL(path, callback) {
-    if (this.stlCache.has(path)) {
-      callback(this.stlCache.get(path));
-      return;
-    }
-
-    this.stlLoader.load(path, (geometry) => {
-      this.stlCache.set(path, geometry);
-      callback(geometry);
-    }, undefined, (error) => {
-      Utils.log(`STL load failed: ${path}`, 'error');
-    });
-  }
-
-  /********************************************
-   * CORE AR RENDERING AND SCENE MANAGEMENT
-   ********************************************/
-
-  startRenderLoop() {
-    const render = () => {
-      requestAnimationFrame(render);
-      this.tick();
-    };
-    render();
-  }
-
-  tick() {
-    if (this.video.readyState !== this.video.HAVE_ENOUGH_DATA) return;
-
-    try {
-      this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-      const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-      
-      if (this.videoTexture) this.videoTexture.needsUpdate = true;
-
-      const markers = this.detector.detect(imageData);
-
-      this.updateScene(markers);
-      this.updateAllAnimations();
-
-      this.renderer.autoClear = false;
-      this.renderer.clear();
-      this.renderer.render(this.backgroundScene, this.backgroundCamera);
-      this.renderer.render(this.scene, this.camera);
-
-      this.lastFrameMarkers = markers.slice();
-      this.updateDebugInfo(markers);
-    } catch (error) {
-      Utils.log(`AR render error: ${error.message}`, 'error');
-    }
-  }
-
   updateScene(markers) {
     // Clear existing 3D objects (keep lights and camera)
     while (this.scene.children.length > 3) {
@@ -2989,12 +2112,6 @@ class ARManager {
 
     const markerMap = new Map();
     markers.forEach(marker => markerMap.set(marker.id, marker));
-
-    // Update currently detected markers tracking
-    this.currentlyDetectedMarkers.clear();
-    markers.forEach(marker => {
-      this.currentlyDetectedMarkers.set(marker.id, marker);
-    });
 
     // Stop animations for markers that are no longer visible
     for (let markerId of this.activeOverlays.keys()) {
@@ -3056,11 +2173,14 @@ class ARManager {
         }
       } else {
         // Fall back to 3D models if no animation
+        // FIXED: Check for direct marker match first, then scenario-based matching
+        
+        // Direct marker-to-model mapping
         const directModel = this.getDirectModelForMarker(markerId);
         if (directModel) {
           this.placeObject(marker, directModel);
         } else {
-          // Legacy scenario-based system
+          // Legacy scenario-based system (confidence tracking)
           const activeScenario = extendedScenarios.find(s => s.identifierTag === bestScenarioID);
           if (activeScenario) {
             activeScenario.objects.forEach(obj => {
@@ -3077,6 +2197,74 @@ class ARManager {
     this.updateKitInfo(markers);
   }
 
+  updateAllAnimations() {
+    this.activeOverlays.forEach((animState, markerId) => {
+      if (animState.marker) {
+        this.positionOverlay(markerId, animState.marker);
+      }
+    });
+  }
+
+  placeObject(marker, stlRelativePath) {
+    if (!this.stlLoader) return;
+
+    const stlFullPath = `models/${stlRelativePath}`;
+    
+    const corners = marker.corners.map(corner => ({
+      x: corner.x - (this.canvas.width / 2),
+      y: (this.canvas.height / 2) - corner.y
+    }));
+
+    const pose = this.posit.pose(corners);
+
+    this.loadSTL(stlFullPath, (geometry) => {
+      geometry.computeBoundingBox();
+      const min = geometry.boundingBox.min;
+      const max = geometry.boundingBox.max;
+      const center = new THREE.Vector3().addVectors(min, max).multiplyScalar(0.5);
+      const offset = center.clone().multiplyScalar(-1);
+
+      if (geometry.isBufferGeometry) {
+        geometry.translate(offset.x, offset.y, offset.z);
+      } else {
+        const mat = new THREE.Matrix4().makeTranslation(offset.x, offset.y, offset.z);
+        geometry.applyMatrix(mat);
+      }
+
+      const material = new THREE.MeshPhongMaterial({ color: 0xD4A574 });
+      const mesh = new THREE.Mesh(geometry, material);
+
+      const scaleFactor = 0.05 * this.modelSize * 0.02;
+      mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+      const r = pose.bestRotation;
+      mesh.rotation.x = -Math.asin(-r[1][2]);
+      mesh.rotation.y = -Math.atan2(r[0][2], r[2][2]);
+      mesh.rotation.z = Math.atan2(r[1][0], r[1][1]);
+
+      mesh.position.x = pose.bestTranslation[0];
+      mesh.position.y = pose.bestTranslation[1];
+      mesh.position.z = -pose.bestTranslation[2];
+
+      this.scene.add(mesh);
+    });
+  }
+
+  loadSTL(path, callback) {
+    if (this.stlCache.has(path)) {
+      callback(this.stlCache.get(path));
+      return;
+    }
+
+    this.stlLoader.load(path, (geometry) => {
+      this.stlCache.set(path, geometry);
+      callback(geometry);
+    }, undefined, (error) => {
+      Utils.log(`STL load failed: ${path}`, 'error');
+    });
+  }
+
+  // UPDATED: Enhanced UI info with cache status
   updateKitInfo(markers) {
     const kitNameEl = Utils.$('arKitName');
     const kitDescEl = Utils.$('arKitDesc');
@@ -3085,65 +2273,30 @@ class ARManager {
       const markerInfos = [];
       let animationCount = 0;
       let modelCount = 0;
-      let multipleAvailable = 0;
-      let noAnimationCount = 0;
       
       markers.forEach(marker => {
-        const animations = this.animationsByMarker.get(marker.id);
-        if (animations && animations.length > 0) {
-          if (animations.length > 1) {
-            multipleAvailable++;
-            const selected = this.markerAnimationPreferences.get(marker.id);
-            const selectedAnim = animations.find(a => a.id === selected);
-            markerInfos.push(`${selectedAnim ? selectedAnim.name : animations[0].name} (${animations.length} available) - ID: ${marker.id}`);
-          } else {
-            markerInfos.push(`Animation: "${animations[0].name}" (ID: ${marker.id})`);
-          }
+        const animation = this.getAnimationForMarker(marker.id);
+        if (animation) {
+          markerInfos.push(`Animation: "${animation.name}" (ID: ${marker.id})`);
           animationCount++;
         } else {
-          // Check if it's a known 3D model scenario
           const activeScenario = extendedScenarios.find(s => s.identifierTag === marker.id);
           if (activeScenario) {
             markerInfos.push(`Model: ${activeScenario.name} (ID: ${marker.id})`);
             modelCount++;
           } else {
-            markerInfos.push(`Marker ID: ${marker.id} (no content)`);
-            noAnimationCount++;
+            markerInfos.push(`Marker ID: ${marker.id}`);
+            modelCount++;
           }
         }
       });
 
       if (kitNameEl) kitNameEl.textContent = markerInfos.join(', ');
       if (kitDescEl) {
-        let description = '';
-        
-        if (animationCount > 0) {
-          description += `${animationCount} animation(s)`;
-        }
-        
-        if (modelCount > 0) {
-          if (description) description += ' and ';
-          description += `${modelCount} 3D model(s)`;
-        }
-        
-        if (!description) {
-          description = 'No content available for detected markers';
-        } else {
-          description = `Displaying ${description}`;
-        }
-        
-        if (multipleAvailable > 0) {
-          description += ` • ${multipleAvailable} marker(s) have multiple animations`;
-        }
-        
-        if (noAnimationCount > 0) {
-          description += ` • ${noAnimationCount} marker(s) have no animations`;
-        }
-        
+        let description = `Displaying ${animationCount} animation(s) and ${modelCount} 3D model(s)`;
         if (this.animationLibrary.size > 0) {
           description += ` • ${this.animationLibrary.size} animations cached`;
         }
-        
         kitDescEl.textContent = description;
       }
     } else {
@@ -3206,10 +2359,7 @@ class ARManager {
     }
   }
 
-  /********************************************
-   * PUBLIC AR INTERFACE METHODS
-   ********************************************/
-
+  // UPDATED: Start experience with animation refresh
   startExperience() {
     Utils.addClass('arInitialOverlay', 'hidden');
     if (!this.isInitialized) {
@@ -3261,34 +2411,16 @@ class ARManager {
     window.CV_RENDER_HEIGHT = renderHeight;
   }
 
+  // UPDATED: Enhanced cleanup with animation cache
   cleanup() {
     this.animationIntervals.forEach(intervalId => clearInterval(intervalId));
     this.animationIntervals.clear();
     this.activeOverlays.clear();
     
-    // Clear animation caches
+    // Clear animation cache
     this.animationLibrary.clear();
-    this.animationsByMarker.clear();
     this.animationsLoaded = false;
     this.loadingAnimations = false;
-    
-    // Clear marker tracking
-    this.currentlyDetectedMarkers.clear();
-    this.markersWithMultipleAnimations.clear();
-    
-    // Clean up selection menu
-    if (this.selectorMenu) {
-      this.selectorMenu.remove();
-      this.selectorMenu = null;
-    }
-    
-    if (this.settingsButton) {
-      this.settingsButton.remove();
-      this.settingsButton = null;
-    }
-    
-    this.isMenuVisible = false;
-    this.currentMarkerForSelection = null;
     
     if (this.overlayContainer) {
       this.overlayContainer.remove();
@@ -3306,7 +2438,7 @@ class ARManager {
     this.stlCache.clear();
     this.isInitialized = false;
     
-    Utils.log('Complete ARManager cleaned up', 'info');
+    Utils.log('ARManager cleaned up', 'info');
   }
 }
 
