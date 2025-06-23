@@ -2071,6 +2071,22 @@ class ARManager {
       const centerX = marker.corners.reduce((sum, c) => sum + c.x, 0) / 4;
       const centerY = marker.corners.reduce((sum, c) => sum + c.y, 0) / 4;
 
+      // Calculate rotation angle from marker corners
+      // Use the vector from corner 0 to corner 1 to determine rotation
+      const corner0 = marker.corners[0];
+      const corner1 = marker.corners[1];
+      
+      const deltaX = corner1.x - corner0.x;
+      const deltaY = corner1.y - corner0.y;
+      
+      // Calculate angle in radians, then convert to degrees
+      let rotationAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI);
+      
+      // Normalize angle to 0-360 range
+      if (rotationAngle < 0) {
+        rotationAngle += 360;
+      }
+
       const container = Utils.$('threeContainer');
       if (!container) return;
 
@@ -2081,8 +2097,11 @@ class ARManager {
       const screenX = centerX * scaleX;
       const screenY = centerY * scaleY;
 
+      // Apply position and rotation transform
       animState.element.style.left = (screenX - 100) + 'px';
       animState.element.style.top = (screenY - 100) + 'px';
+      animState.element.style.transform = `rotate(${rotationAngle}deg)`;
+      animState.element.style.transformOrigin = 'center center';
       animState.element.style.display = 'block';
       
     } catch (error) {
