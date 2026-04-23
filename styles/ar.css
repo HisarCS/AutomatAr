@@ -1,0 +1,494 @@
+/* AR screen — camera view, sidebar, overlays. */
+
+#arScreen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  background: var(--bg);
+  z-index: 1000;
+}
+
+/* Top instruction banner — compact pill sitting inside the camera-view
+   rectangle. Starts past the Home button and is capped to never reach the
+   sidebar's left edge. */
+.ar-header {
+  position: absolute;
+  top: clamp(0.6rem, 1.2vw, 0.8rem);
+  left: calc(clamp(0.75rem, 1.5vw, 1rem) + 120px);
+  right: auto;
+  width: auto;
+  max-width: calc(
+    100vw
+    - clamp(250px, 35vw, 450px)                        /* sidebar */
+    - clamp(0.75rem, 1.5vw, 1rem)                      /* sidebar gap   */
+    - (clamp(0.75rem, 1.5vw, 1rem) + 120px)            /* Home gutter   */
+  );
+  z-index: 10;
+  padding: 0.55rem 1rem;
+  background: #1A140E;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.ar-header::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex-shrink: 0;
+  animation: ar-pulse 2s ease-in-out infinite;
+}
+
+.ar-header p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  text-align: left;
+}
+
+.ar-header p strong {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+/* Floating corner buttons */
+.ar-back-button,
+.ar-help-button {
+  position: absolute;
+  top: clamp(0.75rem, 1.5vw, 1rem);
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  border: 1px solid var(--hairline-strong);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ar-back-button  { left: clamp(0.75rem, 1.5vw, 1rem); }
+.ar-help-button  { right: clamp(0.75rem, 1.5vw, 1rem); }
+
+.ar-back-button:hover,
+.ar-help-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border-color: rgba(255, 140, 0, 0.45);
+}
+
+/* Camera viewport + targeting brackets */
+.ar-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.ar-container::before,
+.ar-container::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  width: 14%;
+  height: 14%;
+  border: 0 solid rgba(255, 140, 0, 0.55);
+}
+
+.ar-container::before {
+  top: 10%;
+  left: 3%;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.ar-container::after {
+  bottom: 10%;
+  right: calc(clamp(250px, 35vw, 450px) + 3%);
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+#video  { display: none; }
+#canvas { display: none; }
+
+#threeContainer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 100%;
+  z-index: 5;
+}
+
+.ar-background {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+/* Left rail retained for structural compatibility but visually hidden —
+   the dark background already covers the void. */
+.ar-left-panel {
+  display: none;
+}
+
+/* Sidebar on the right */
+.ar-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 15;
+  width: clamp(250px, 35vw, 450px);
+  height: 100%;
+  padding: 1.25rem 1.25rem 1.5rem;
+  background: #1A140E;
+  border-left: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+}
+
+.ar-sidebar h3 {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 0.9rem;
+}
+
+.ar-kit-info {
+  flex: 0 0 auto;
+  overflow-y: auto;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  position: relative;
+  max-height: 40vh;
+}
+
+/* Status indicator — pulsing orange by default, green when a marker is detected */
+.ar-kit-info::before {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 0 0 4px rgba(255, 140, 0, 0.15);
+  margin-bottom: 0.8rem;
+  animation: ar-pulse 2s ease-in-out infinite;
+}
+
+.ar-kit-info.has-marker::before {
+  background: #4CAF50;
+  box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2);
+  animation: none;
+}
+
+.ar-kit-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.45rem;
+}
+
+.ar-kit-desc {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+/* Animation Settings button (dynamically injected by JS) — force it neutral
+   and push it + the Debug button to the bottom of the sidebar via margin-top:auto. */
+.ar-sidebar > button[style] {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--hairline-strong) !important;
+  width: 100% !important;
+  height: 40px !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.2px !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+  margin: auto 0 0.6rem 0 !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+
+.ar-sidebar > button[style]:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 140, 0, 0.5) !important;
+}
+
+.ar-sidebar > button[style] > span {
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+
+/* Debug button at sidebar bottom */
+.debug-button {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  border: 1px solid var(--hairline-strong);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.debug-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border-color: rgba(255, 140, 0, 0.45);
+}
+
+/* Initial overlay (Start Camera) */
+.ar-initial-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  padding: clamp(1rem, 4vw, 2rem);
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ar-initial-overlay.hidden { display: none; }
+
+.ar-initial-content {
+  max-width: 460px;
+  padding: 1.75rem;
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+}
+
+.ar-initial-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  color: var(--text);
+}
+
+.ar-instructions-grid { margin-bottom: 1.25rem; }
+
+.ar-instruction-item {
+  padding: 0.8rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--brand);
+  border-radius: var(--radius-sm);
+}
+
+.ar-instruction-item h4 {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 0.4rem;
+}
+
+.ar-instruction-item p {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.ar-start-button {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1.6rem;
+  background: var(--brand);
+  color: #ffffff;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ar-start-button:hover {
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+}
+
+/* Instructions overlay (Help) */
+.ar-instructions-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s;
+}
+
+.ar-instructions-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ar-instructions-content {
+  max-width: clamp(400px, 90vw, 600px);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  background: var(--bg-elev);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+}
+
+.ar-instructions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.ar-instructions-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ar-instructions-close {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ar-instructions-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  border-color: rgba(255, 140, 0, 0.45);
+}
+
+.ar-instructions-section { margin-bottom: 1.5rem; }
+
+.ar-instructions-section h4 {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 0.6rem;
+}
+
+.ar-instructions-section p,
+.ar-instructions-section li {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  line-height: 1.6;
+  margin-bottom: 0.4rem;
+}
+
+.ar-instructions-section ul {
+  padding-left: 1.25rem;
+}
+
+/* Debug overlay */
+.debug-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  padding: clamp(1rem, 3vw, 2rem);
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.95);
+  color: #ffffff;
+}
+
+.debug-overlay.visible { display: block; }
+
+.debug-overlay-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.debug-overlay-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.debug-close {
+  padding: 0.45rem 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.debug-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 140, 0, 0.45);
+}
+
+.marker-info {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+}
+
+.debug-canvas-container {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+#debugCanvas {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  max-width: 100%;
+  height: auto;
+}

@@ -323,7 +323,7 @@ class ScreenManager {
     });
 
     this.screens.set(SCREENS.MODELS, {
-      element: Utils.$('modelsScreen'),
+      element: Utils.$('manualsScreen'),
       show: () => this.showModelsScreen(),
       hide: () => this.hideModelsScreen()
     });
@@ -367,7 +367,6 @@ class ScreenManager {
     Utils.hideElement('kitDetailScreen');
     Utils.hideElement('arScreen');
     Utils.removeClass('manualsScreen', 'active');
-    Utils.removeClass('modelsScreen', 'active');
     Utils.removeClass('aiScreen', 'active');
     Utils.removeClass('createScreen', 'active');
   }
@@ -403,23 +402,32 @@ class ScreenManager {
       if (titleEl) titleEl.textContent = kit.name;
       if (descEl) descEl.textContent = kit.desc;
 
+      const kitNum = kitId + 1;
+
       const video = Utils.$('kitDetailVideo');
       if (video) {
         const source = video.querySelector('source');
         if (source) {
-          source.src = `videos/kit${kitId + 1}.mp4`;
+          source.src = `images/kit${kitNum}.mp4`;
           video.load();
         }
-        
+
         video.addEventListener('loadeddata', function() {
           const placeholder = Utils.$('kitDetailImg');
           if (placeholder) placeholder.style.display = 'none';
         });
       }
-      
+
+      // Per-kit download buttons on the detail page.
+      const manualBtn = Utils.$('kitManualDlBtn');
+      if (manualBtn) manualBtn.onclick = () => window.downloadManualPDF && window.downloadManualPDF(String(kitNum));
+
+      const modelBtn = Utils.$('kitModelDlBtn');
+      if (modelBtn) modelBtn.onclick = () => window.downloadModel && window.downloadModel(String(kitNum));
+
       AppState.selectedKit = kitId;
     }
-    
+
     Utils.showElement('kitDetailScreen');
   }
 
@@ -453,7 +461,7 @@ class ScreenManager {
 
   showModelsScreen() {
     this.hideAllScreens();
-    Utils.addClass('modelsScreen', 'active');
+    Utils.addClass('manualsScreen', 'active');
   }
 
   hideModelsScreen() {
@@ -1190,7 +1198,14 @@ class CreateManager {
     const speedSlider = document.getElementById('createSpeedSlider');
     const libraryBtn = document.getElementById('animLibraryTopBtn');
 
-    if (captureBtn) captureBtn.onclick = () => this.capture();
+    if (captureBtn) {
+      captureBtn.onclick = () => {
+        if (captureBtn.dataset.busy === '1') return;
+        captureBtn.dataset.busy = '1';
+        try { this.capture(); }
+        finally { setTimeout(() => { captureBtn.dataset.busy = ''; }, 500); }
+      };
+    }
     if (clearBtn) clearBtn.onclick = () => this.clearAll();
     if (playBtn) playBtn.onclick = () => this.togglePlay();
     if (resetBtn) resetBtn.onclick = () => this.reset();
@@ -1757,7 +1772,7 @@ class ARManager {
   // NEW: Create settings button
   createSettingsButton() {
     this.settingsButton = document.createElement('button');
-    this.settingsButton.innerHTML = '⚙️';
+    this.settingsButton.innerHTML = '';
     this.settingsButton.title = 'Animation Preferences';
     this.settingsButton.style.cssText = `
       background: rgba(156, 39, 176, 0.9);
@@ -3443,11 +3458,10 @@ class EventHandlerManager {
 
   static setupNavigationHandlers() {
     const handlers = [
+      { id: 'homeBtn', action: () => App.screenManager.switchTo(SCREENS.HOME) },
       { id: 'createBtn', action: () => App.screenManager.switchTo(SCREENS.CREATE) },
-      { id: 'manualsBtn', action: () => App.screenManager.switchTo(SCREENS.MANUALS) },
       { id: 'openARBtn', action: () => App.screenManager.switchTo(SCREENS.AR) },
       { id: 'createOpenARBtn', action: () => App.screenManager.switchTo(SCREENS.AR) },
-      { id: 'modelsBtn', action: () => App.screenManager.switchTo(SCREENS.MODELS) },
       { id: 'aiBtn', action: () => App.screenManager.switchTo(SCREENS.AI) },
       
       { id: 'kitBackHomeBtn', action: () => App.screenManager.switchTo(SCREENS.HOME) },

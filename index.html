@@ -18,212 +18,233 @@
   <script src="src/optic.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Stylesheets -->
-  <link rel="stylesheet" href="styles.css">
+  <!-- Stylesheets (split per concern for manageability) -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/animations.css">
+  <link rel="stylesheet" href="styles/header.css">
+  <link rel="stylesheet" href="styles/home.css">
+  <link rel="stylesheet" href="styles/kit-detail.css">
+  <link rel="stylesheet" href="styles/modals.css">
+  <link rel="stylesheet" href="styles/library.css">
+  <link rel="stylesheet" href="styles/ar.css">
+  <link rel="stylesheet" href="styles/create.css">
+  <link rel="stylesheet" href="styles/pdf-viewer.css">
   
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 
  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    /* ============================================================
+       AutomatAR — Modern Theme (scoped to AI + Create screens)
+       Design tokens are declared in styles/tokens.css :root.
+       ============================================================ */
+
+    /* AI Screen ------------------------------------------------- */
+    #aiScreen {
+      background: #14100B;
+      height: 100vh;
+      min-height: 0;
+      font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+      color: #F5EFE8;
+      overflow: hidden !important;
+      padding-bottom: 0 !important;
     }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #FF8C00 0%, #FF7F00 100%);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Header */
     .ai-header {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 1.5rem 2rem;
-      text-align: center;
-      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
       position: sticky;
       top: 0;
       z-index: 100;
-      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      padding: 0.9rem clamp(1rem, 3vw, 2rem);
+      background: #1A140E;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      height: 60px;
+      box-sizing: border-box;
     }
 
     .ai-close-button {
       position: absolute;
-      top: 1.5rem;
-      left: 2rem;
-      background: #ffffff;
-      color: #FF8C00;
-      border: 2px solid #ffffff;
-      padding: 0.8rem 1.5rem;
-      border-radius: 8px;
+      top: 50%;
+      left: clamp(1rem, 3vw, 1.5rem);
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(245, 239, 232, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 0.55rem 1rem;
+      border-radius: 999px;
       cursor: pointer;
-      font-weight: 700;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-      font-size: 0.9rem;
+      font-weight: 600;
+      font-size: 0.82rem;
+      letter-spacing: 0.3px;
+      text-transform: none;
+      box-shadow: none;
+      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
     }
 
     .ai-close-button:hover {
-      background: #FF8C00;
-      color: #ffffff;
-      transform: translateY(-1px);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.1);
+      color: #F5EFE8;
+      border-color: rgba(255, 140, 0, 0.45);
     }
 
     .ai-header-title {
-      font-size: 2.5rem;
+      font-size: clamp(1.15rem, 2.4vw, 1.4rem);
       font-weight: 700;
-      color: #ffffff;
-      margin-bottom: 0.5rem;
-      text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+      letter-spacing: 0;
+      color: #FF8C00;
+      margin: 0;
+      text-shadow: none;
     }
 
     .ai-header-subtitle {
-      font-size: 1.1rem;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 500;
+      display: none; /* keep header slim; subtitle moved into first card context */
     }
 
-    /* Main Container */
+    /* Main Container — vertical stack of horizontal cards, one-viewport fit */
     .ai-main-container {
-      max-width: 1200px;
+      max-width: 1000px;
       margin: 0 auto;
-      padding: 2rem;
-      height: calc(100vh - 140px);
-      overflow-y: auto;
+      padding: clamp(0.5rem, 1vh, 0.75rem) clamp(1rem, 3vw, 1.5rem) calc(80px + clamp(0.5rem, 1vh, 0.75rem));
+      height: calc(100vh - 60px);
+      max-height: none;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.4rem, 0.8vh, 0.6rem);
+      box-sizing: border-box;
     }
 
-    /* Card Container */
     .ai-card-container {
-      margin-bottom: 2rem;
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+      margin-bottom: 0;
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
     }
 
     .ai-card-container.animate-in {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
 
-    /* Horizontal Card Design */
+    /* Horizontal card — left: dropdown, right: preview */
     .ai-horizontal-card {
-      background: linear-gradient(145deg, 
-        rgba(230, 245, 255, 0.95) 0%, 
-        rgba(210, 235, 255, 0.9) 100%);
-      border-radius: 20px;
-      box-shadow: 
-        0 20px 60px rgba(0, 0, 0, 0.05),
-        0 8px 24px rgba(180, 220, 255, 0.15),
-        inset 0 2px 0 rgba(255, 255, 255, 0.8);
       display: flex;
-      min-height: 260px;
+      flex-direction: row;
+      width: 100%;
+      min-height: 0;
       position: relative;
-      overflow: visible;
-      border: 3px solid rgba(255, 255, 255, 0.5);
-      backdrop-filter: blur(10px);
-      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      overflow: hidden;
+      border-radius: 12px;
+      background: #1C1712;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: none;
+      transition: border-color 0.2s ease;
     }
+
+    /* When a dropdown inside this card is open, let it escape the card
+       and the main container so every option is visible. */
+    .ai-horizontal-card:has(.dropdown-menu.open) { overflow: visible; }
+    .ai-main-container:has(.dropdown-menu.open)  { overflow: visible; }
 
     .ai-horizontal-card:hover {
-      transform: translateY(-8px) scale(1.02);
-      box-shadow: 
-        0 30px 80px rgba(0, 0, 0, 0.1),
-        0 12px 36px rgba(180, 220, 255, 0.25),
-        inset 0 2px 0 rgba(255, 255, 255, 0.9);
-      border-color: rgba(255, 255, 255, 0.7);
+      border-color: rgba(255, 255, 255, 0.18);
     }
 
-    /* Left Side - Dropdown Area */
     .card-left-side {
       flex: 1;
-      padding: 2rem;
+      padding: 0.7rem 1rem;
       display: flex;
       flex-direction: column;
       justify-content: center;
       position: relative;
-      background: linear-gradient(135deg, 
-        rgba(210, 235, 255, 0.2) 0%, 
-        rgba(190, 225, 250, 0.3) 100%);
+      background: transparent;
     }
 
     .card-title {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #4BA3C7;
-      margin-bottom: 0.5rem;
-      text-shadow: 0 2px 4px rgba(75, 163, 199, 0.3);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #F5EFE8;
+      margin-bottom: 0.1rem;
+      text-shadow: none;
+      letter-spacing: 0;
     }
 
     .card-subtitle {
-      font-size: 1.1rem;
-      color: #666;
-      margin-bottom: 2rem;
-      font-weight: 500;
+      font-size: 0.75rem;
+      color: rgba(245, 239, 232, 0.55);
+      margin-bottom: 0.5rem;
+      font-weight: 400;
+      line-height: 1.3;
     }
 
-    /* Right Side - Image Area */
     .card-right-side {
-      flex: 1.5;
-      background: linear-gradient(135deg, #e6f5ff 0%, #d0ebff 100%);
+      flex: 1.1;
+      background: #0F0C08;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       overflow: hidden;
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-bottom: none;
     }
 
     /* Custom Dropdown */
     .custom-dropdown {
       position: relative;
       width: 100%;
-      max-width: 300px;
+      max-width: none;
       z-index: 1000;
     }
 
     .dropdown-trigger {
       width: 100%;
-      background: linear-gradient(145deg, #ffffff, #f8f9fa);
-      border: 2px solid #FF8C00;
-      border-radius: 12px;
-      padding: 1rem 1.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #FF8C00;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #F5EFE8;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 
-        0 4px 12px rgba(255, 140, 0, 0.2),
-        inset 0 1px 0 rgba(255, 255, 255, 0.8);
-      transition: all 0.3s ease;
+      box-shadow: none;
+      transition: border-color 0.2s ease, background 0.2s ease;
     }
 
     .dropdown-trigger:hover {
-      background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-      border-color: #FF7F00;
-      box-shadow: 
-        0 6px 18px rgba(255, 140, 0, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 140, 0, 0.4);
     }
 
     .dropdown-trigger.active {
-      border-color: #FF6600;
-      background: linear-gradient(145deg, #fff3e0, #ffe0b2);
+      border-color: #FF8C00;
+      background: rgba(255, 140, 0, 0.1);
+      box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.12);
     }
 
+    /* CSS-drawn chevron (no emoji/glyph) */
     .dropdown-arrow {
-      font-size: 0.8rem;
-      transition: transform 0.3s ease;
+      width: 10px;
+      height: 10px;
+      border-right: 2px solid #FFB74D;
+      border-bottom: 2px solid #FFB74D;
+      transform: rotate(45deg) translate(-2px, -2px);
+      transition: transform 0.25s ease;
+      margin-left: 0.75rem;
+      flex-shrink: 0;
     }
 
     .dropdown-trigger.active .dropdown-arrow {
-      transform: rotate(180deg);
+      transform: rotate(-135deg) translate(-2px, -2px);
     }
 
     .dropdown-menu {
@@ -231,34 +252,57 @@
       top: 100%;
       left: 0;
       right: 0;
-      background: #ffffff;
-      border: 2px solid #FF8C00;
+      background: #251E16;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 12px;
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
-      max-height: 240px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+      max-height: min(360px, 60vh);
       overflow-y: auto;
       z-index: 1001;
-      margin-top: 8px;
+      margin-top: 6px;
       opacity: 0;
       visibility: hidden;
-      transform: translateY(-20px);
-      transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+      transform: translateY(-8px);
+      transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
     }
 
     .dropdown-menu.open {
       opacity: 1;
       visibility: visible;
+      transform: translateY(0);
+    }
+
+    /* For the bottom-most card, flip the dropdown to open upward so it
+       doesn't get clipped by the viewport or the View Scenario bar. */
+    .ai-card-container:last-child .dropdown-menu {
+      top: auto;
+      bottom: calc(100% + 6px);
+      margin-top: 0;
       transform: translateY(8px);
     }
 
+    .ai-card-container:last-child .dropdown-menu.open {
+      transform: translateY(0);
+    }
+
+    /* Chevron inverted on the bottom card: up when closed, down when open. */
+    .ai-card-container:last-child .dropdown-arrow {
+      transform: rotate(-135deg) translate(-2px, -2px);
+    }
+
+    .ai-card-container:last-child .dropdown-trigger.active .dropdown-arrow {
+      transform: rotate(45deg) translate(-2px, -2px);
+    }
+
     .dropdown-option {
-      padding: 1rem 1.5rem;
+      padding: 0.85rem 1rem;
       font-size: 0.95rem;
-      color: #333;
+      color: rgba(245, 239, 232, 0.88);
       cursor: pointer;
-      border-bottom: 1px solid rgba(255, 140, 0, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       font-weight: 500;
-      transition: all 0.2s ease;
+      line-height: 1.3;
+      transition: background 0.15s ease, color 0.15s ease;
     }
 
     .dropdown-option:last-child {
@@ -266,21 +310,17 @@
     }
 
     .dropdown-option:hover {
-      background: linear-gradient(135deg, 
-        rgba(255, 140, 0, 0.1) 0%, 
-        rgba(255, 165, 0, 0.05) 100%);
-      color: #FF8C00;
-      font-weight: 600;
+      background: rgba(255, 140, 0, 0.12);
+      color: #FFB74D;
     }
 
     .dropdown-option.selected {
-      background: linear-gradient(135deg, 
-        rgba(255, 140, 0, 0.2) 0%, 
-        rgba(255, 165, 0, 0.1) 100%);
-      color: #FF6600;
+      background: rgba(255, 140, 0, 0.2);
+      color: #FFB74D;
       font-weight: 600;
     }
 
+    /* Image Area — the image fills the entire right-side panel. */
     .card-image-container {
       width: 100%;
       height: 100%;
@@ -288,75 +328,78 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
     }
 
     .card-image {
-      max-width: 90%;
-      max-height: 90%;
-      object-fit: contain;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+      border-radius: 0;
+      transition: opacity 0.35s ease;
       opacity: 0;
-      transform: scale(0.8);
+      transform: none;
     }
 
     .card-image.loaded {
       opacity: 1;
-      transform: scale(1);
-    }
-
-    .card-image:hover {
-      transform: scale(1.05);
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
     }
 
     .image-placeholder {
-      width: 150px;
-      height: 150px;
-      background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+      width: 56px;
+      height: 56px;
+      background: rgba(255, 140, 0, 0.08);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 3rem;
-      color: #adb5bd;
-      border: 3px dashed #ced4da;
-      transition: all 0.3s ease;
+      font-size: 1.2rem;
+      color: #FFB74D;
+      border: 1px dashed rgba(255, 140, 0, 0.35);
+      transition: background 0.25s ease;
+      font-weight: 600;
     }
 
     .image-placeholder:hover {
-      background: linear-gradient(135deg, #dee2e6 0%, #ced4da 100%);
-      color: #868e96;
+      background: rgba(255, 140, 0, 0.15);
     }
 
     /* Help Button */
     .help-button {
       position: absolute;
-      bottom: 1rem;
-      left: 1rem;
-      background: #FF8C00;
-      color: #ffffff;
-      border: none;
+      top: 1rem;
+      right: 1rem;
+      bottom: auto;
+      left: auto;
+      background: transparent;
+      color: #FFB74D;
+      border: 1.5px solid rgba(255, 140, 0, 0.4);
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.2rem;
+      width: 28px;
+      height: 28px;
+      font-size: 0.85rem;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
-      transition: all 0.3s ease;
+      box-shadow: none;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
       z-index: 10;
     }
 
     .help-button:hover {
-      background: #FF7F00;
-      transform: scale(1.1);
-      box-shadow: 0 6px 18px rgba(255, 140, 0, 0.4);
+      background: #FF8C00;
+      color: #ffffff;
+      transform: none;
+      border-color: #FF8C00;
+      box-shadow: none;
     }
 
     /* Scenario Button */
@@ -366,45 +409,54 @@
       left: 0;
       right: 0;
       z-index: 200;
+      padding: 1rem clamp(1rem, 3vw, 2rem);
+      background: rgba(15, 12, 8, 0.9);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      pointer-events: none;
     }
 
     .scenario-button {
       width: 100%;
-      height: 60px;
-      background: linear-gradient(135deg, #FF8C00 0%, #FF7F00 100%);
-      border: none;
+      max-width: 1080px;
+      margin: 0 auto;
+      display: block;
+      height: 48px;
+      background: #FF8C00;
+      border: 1px solid #FF8C00;
       color: #ffffff;
-      font-size: 1.2rem;
-      font-weight: 700;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.2px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      border-radius: 10px;
+      pointer-events: auto;
+      box-shadow: none;
+      text-transform: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
     }
 
     .scenario-button:hover {
-      background: linear-gradient(135deg, #FF7F00 0%, #FF6600 100%);
-      box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
+      background: #F57C00;
+      border-color: #F57C00;
+      transform: none;
+      box-shadow: none;
     }
 
     /* Scenario Popup */
     .scenario-popup {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(10px);
+      inset: 0;
+      background: rgba(30, 15, 0, 0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       z-index: 300;
       display: flex;
       align-items: center;
       justify-content: center;
       opacity: 0;
       visibility: hidden;
-      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      transition: opacity 0.3s ease, visibility 0.3s;
+      padding: 1.5rem;
     }
 
     .scenario-popup.open {
@@ -413,113 +465,106 @@
     }
 
     .scenario-content {
-      background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
-      border-radius: 20px;
-      padding: 3rem;
-      max-width: 800px;
+      background: #1C1712;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 2.5rem;
+      max-width: 720px;
+      width: 100%;
       max-height: 80vh;
       overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
       position: relative;
-      transform: scale(0.8) translateY(40px);
-      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      transform: translateY(20px) scale(0.98);
+      transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+      color: #F5EFE8;
     }
 
     .scenario-popup.open .scenario-content {
-      transform: scale(1) translateY(0);
+      transform: translateY(0) scale(1);
     }
 
     .scenario-close {
       position: absolute;
       top: 1rem;
       right: 1rem;
-      background: #FF8C00;
-      color: #ffffff;
-      border: none;
+      background: rgba(255, 255, 255, 0.05);
+      color: #FFB74D;
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.2rem;
-      font-weight: 700;
+      width: 34px;
+      height: 34px;
+      font-size: 1.1rem;
+      font-weight: 500;
+      line-height: 1;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
     }
 
     .scenario-close:hover {
-      background: #FF7F00;
-      transform: scale(1.1);
+      background: rgba(255, 140, 0, 0.15);
+      border-color: rgba(255, 140, 0, 0.4);
     }
 
     .scenario-title {
-      font-size: 2rem;
+      font-size: 1.5rem;
       font-weight: 700;
-      color: #FF8C00;
-      margin-bottom: 1.5rem;
-      text-align: center;
+      color: #F5EFE8;
+      margin-bottom: 1rem;
+      text-align: left;
+      padding-right: 2rem;
+      letter-spacing: -0.2px;
     }
 
     .scenario-text {
-      font-size: 1.1rem;
-      line-height: 1.6;
-      color: #333;
-      margin-bottom: 1.5rem;
+      font-size: 1rem;
+      line-height: 1.65;
+      color: rgba(245, 239, 232, 0.85);
+      margin-bottom: 1rem;
+      white-space: pre-line;
     }
 
-    /* Dropdown Z-index fixes */
+    /* Dropdown Z-index fix */
     .ai-card-container.dropdown-open {
       position: relative;
       z-index: 1002;
     }
 
-    /* Responsive Design */
-    @media (max-width: 768px) {
-      .ai-horizontal-card {
-        flex-direction: column;
-        min-height: auto;
-      }
-
-      .card-left-side,
-      .card-right-side {
-        flex: none;
-      }
-
-      .card-left-side {
-        padding: 1.5rem;
-      }
-
-      .card-right-side {
-        min-height: 200px;
-      }
-
+    /* Responsive — allow scroll on narrow/short viewports */
+    @media (max-width: 768px), (max-height: 640px) {
       .ai-main-container {
-        padding: 1rem;
-        height: calc(100vh - 180px);
-        margin-bottom: 60px;
+        height: auto;
+        max-height: none;
+        overflow-y: auto;
       }
-
+      .ai-card-container {
+        flex: 0 0 auto;
+        min-height: 160px;
+      }
+      .ai-horizontal-card {
+        min-height: 160px;
+      }
       .scenario-content {
-        margin: 1rem;
-        padding: 2rem;
+        padding: 1.75rem;
       }
     }
 
     /* Scrollbar Styling */
     .ai-main-container::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     .ai-main-container::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
+      background: transparent;
     }
 
     .ai-main-container::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.35);
       border-radius: 4px;
     }
 
     .ai-main-container::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.55);
     }
 
     /* Animation Classes */
@@ -579,489 +624,18 @@
       }
     }
 
-     #createScreen {
-      background: linear-gradient(135deg, #FF8C00 0%, #FF7F00 100%);
-      min-height: 100vh;
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.5rem 2rem;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .modal-close-button {
-      background: #ffffff;
-      color: #FF8C00;
-      border: 2px solid #ffffff;
-      padding: 0.8rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-    }
-
-    .modal-close-button:hover {
-      background: #FF8C00;
-      color: #ffffff;
-      transform: translateY(-1px);
-    }
-
-    .modal-header-center {
-      text-align: center;
-      flex: 1;
-      margin: 0 2rem;
-    }
-
-    .modal-title {
-      font-size: 2rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-    }
-
-    .modal-subtitle {
-      font-size: 1.1rem;
-      opacity: 0.9;
-      font-weight: 500;
-    }
-
-    .create-section {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
-      padding: 2rem;
-      margin: 2rem;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(10px);
-    }
-
-    .create-section h3 {
-      font-size: 1.8rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      text-align: center;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-    }
-
-    .create-status {
-      text-align: center;
-      margin: 1rem 0;
-      font-weight: 500;
-      padding: 0.8rem;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .create-camera-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-      padding: 1rem 0;
-    }
-
-    .create-camera-box {
-      position: relative;
-      width: 100%;
-      max-width: 600px;
-      height: 450px;
-      border: 3px solid rgba(255, 255, 255, 0.4);
-      border-radius: 16px;
-      overflow: hidden;
-      background: rgba(0, 0, 0, 0.8);
-      margin: 0 auto;
-    }
-
-    #createVideo {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 13px;
-    }
-
-    .create-grid {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(2, 1fr);
-      pointer-events: none;
-      z-index: 10;
-      gap: 2px;
-    }
-
-    .create-cell {
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      position: relative;
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .create-golden {
-      border: 3px solid #FFD700;
-      background: rgba(255, 215, 0, 0.2);
-      box-shadow: 
-        inset 0 0 20px rgba(255, 215, 0, 0.4),
-        0 0 20px rgba(255, 215, 0, 0.3);
-      animation: golden-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes golden-pulse {
-      0%, 100% { 
-        box-shadow: 
-          inset 0 0 20px rgba(255, 215, 0, 0.4),
-          0 0 20px rgba(255, 215, 0, 0.3);
-        border-color: #FFD700;
-      }
-      50% { 
-        box-shadow: 
-          inset 0 0 30px rgba(255, 215, 0, 0.6),
-          0 0 30px rgba(255, 215, 0, 0.5);
-        border-color: #FFF700;
-      }
-    }
-
-    .create-controls {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .create-capture-btn, .create-clear-btn {
-      background: linear-gradient(145deg, #ffffff, #f8f9fa);
-      color: #FF8C00;
-      border: 2px solid #FF8C00;
-      padding: 1rem 2rem;
-      border-radius: 12px;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 1rem;
-      transition: all 0.3s ease;
-      min-width: 200px;
-    }
-
-    .create-capture-btn:hover:not(:disabled),
-    .create-clear-btn:hover {
-      background: linear-gradient(145deg, #FF8C00, #FF7F00);
-      color: #ffffff;
-      transform: translateY(-2px);
-      border-color: #ffffff;
-    }
-
-    .create-capture-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .create-clear-btn {
-      background: linear-gradient(145deg, #ff6b6b, #ff5252);
-      color: #ffffff;
-      border-color: #ff5252;
-    }
-
-    .create-instructions {
-      background: rgba(255, 215, 0, 0.15);
-      padding: 1rem;
-      border-radius: 12px;
-      margin-bottom: 1rem;
-      border: 1px solid rgba(255, 215, 0, 0.3);
-    }
-
-    .create-instructions p {
-      margin: 0.5rem 0;
-      line-height: 1.6;
-    }
-
-    .create-results {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      padding: 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .create-animation-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .create-animation-box {
-      width: 100%;
-      max-width: 500px;
-      height: 250px;
-      border: 3px dashed rgba(255, 255, 255, 0.4);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      background: rgba(0, 0, 0, 0.3);
-      position: relative;
-    }
-
-    .create-animation-box img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      border-radius: 8px;
-    }
-
-    .create-animation-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: rgba(255, 255, 255, 0.8);
-      text-align: center;
-      padding: 1rem;
-      border-radius: 8px;
-    }
-
-    .create-animation-controls {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: center;
-      padding: 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .create-animation-controls button {
-      background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(248, 249, 250, 0.9));
-      color: #FF8C00;
-      border: 2px solid rgba(255, 140, 0, 0.4);
-      padding: 0.8rem 1.5rem;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.3s ease;
-      min-width: 100px;
-    }
-
-    .create-animation-controls button:hover:not(:disabled) {
-      background: linear-gradient(145deg, #FF8C00, #FF7F00);
-      color: #ffffff;
-      border-color: #ffffff;
-      transform: translateY(-1px);
-    }
-
-    .create-animation-controls button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .create-animation-controls label {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: 500;
-    }
-
-    .create-animation-controls input[type="range"] {
-      width: 120px;
-      margin: 0 0.5rem;
-    }
-
-    /* Bottom Button Container - Two Buttons 50/50 */
-    .create-ar-button-container {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 1000;
-      display: flex;
-      background: rgba(0, 0, 0, 0.1);
-      backdrop-filter: blur(10px);
-      border-top: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .animation-library-btn {
-      flex: 1;
-      height: 70px;
-      background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
-      border: none;
-      border-right: 1px solid rgba(255, 255, 255, 0.2);
-      color: #ffffff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .animation-library-btn:hover {
-      background: linear-gradient(135deg, #7B1FA2 0%, #6A1B9A 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 20px rgba(156, 39, 176, 0.4);
-    }
-
-    .create-ar-button {
-      flex: 1;
-      height: 70px;
-      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-      border: none;
-      color: #ffffff;
-      font-size: 1.1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .create-ar-button:hover {
-      background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4);
-    }
-
-    .create-ar-button:active,
-    .animation-library-btn:active {
-      transform: translateY(0);
-    }
-
-    /* Add bottom padding to prevent content overlap */
+    /* Create Screen ------------------------------------------- */
     #createScreen {
-      padding-bottom: 90px;
+      background: #14100B;
+      min-height: 100vh;
+      color: #F5EFE8;
+      font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     }
 
-    /* Mobile Responsive */
-    @media (max-width: 768px) {
-      .modal-header {
-        flex-direction: column;
-        gap: 1rem;
-        padding: 1rem;
-      }
+    /* Create sections, camera, grid — handled in styles/create.css. */
 
-      .modal-header-center {
-        margin: 0;
-      }
-
-      .modal-title {
-        font-size: 1.5rem;
-      }
-
-      .modal-subtitle {
-        font-size: 1rem;
-      }
-
-      .create-section {
-        margin: 1rem;
-        padding: 1.5rem;
-      }
-
-      .create-camera-box {
-        height: 300px;
-      }
-
-      .create-controls {
-        flex-direction: column;
-        align-items: center;
-      }
-
-      .create-capture-btn, .create-clear-btn {
-        width: 100%;
-        max-width: 300px;
-      }
-
-      .create-animation-controls {
-        flex-direction: column;
-        gap: 1rem;
-      }
-
-      .animation-library-btn,
-      .create-ar-button {
-        height: 60px;
-        font-size: 1rem;
-      }
-
-      #createScreen {
-        padding-bottom: 80px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .create-section {
-        margin: 0.5rem;
-        padding: 1rem;
-      }
-
-      .create-camera-box {
-        height: 250px;
-      }
-
-      .create-animation-box {
-        height: 200px;
-      }
-
-      .animation-library-btn,
-      .create-ar-button {
-        height: 55px;
-        font-size: 0.9rem;
-        letter-spacing: 0.3px;
-      }
-
-      .create-ar-button {
-        gap: 0.3rem;
-      }
-
-      #createScreen {
-        padding-bottom: 75px;
-      }
-    }
-
-    @media (max-width: 360px) {
-      .animation-library-btn,
-      .create-ar-button {
-        font-size: 0.8rem;
-        height: 50px;
-      }
-      
-      .animation-library-btn {
-        text-transform: none;
-      }
-      
-      .create-ar-button {
-        gap: 0.2rem;
-      }
-      
-      #createScreen {
-        padding-bottom: 70px;
-      }
-    }
+    /* Create-screen bottom button bar has been retired — all controls now
+       live inside each wizard step (see styles/create.css). */
   </style>
 </head>
 <body>
@@ -1074,10 +648,9 @@
       <div></div>
       <h1>AutomatAR</h1>
       <nav class="header-buttons" role="navigation" aria-label="Main navigation">
+        <button class="header-button" id="homeBtn" aria-label="Return to home page">Home</button>
         <button class="header-button" id="createBtn" aria-label="Create new content">Create</button>
-        <button class="header-button" id="manualsBtn" aria-label="View instruction manuals">Manuals</button>
         <button class="header-ar-button" id="openARBtn" aria-label="Open augmented reality experience">AR</button>
-        <button class="header-button" id="modelsBtn" aria-label="Download 3D models">Models</button>
         <button class="header-button" id="aiBtn" aria-label="AI learning assistant">AI</button>
       </nav>
     </div>
@@ -1095,31 +668,31 @@
 
     <!-- Cam-A Kit Section -->
     <section class="kit-section" aria-labelledby="cam-a-title">
-      <div class="kit-content">
-        <div class="kit-text">
-          <h3 id="cam-a-title">Cam-A: Learn the details of rotational motion</h3>
-          <p>Demonstrates how cams convert rotational motion into linear oscillatory motion using contoured surfaces to drive followers in precise, complex patterns.</p>
-        </div>
-        <div class="kit-image" onclick="showKitDetail(0)" role="button" tabindex="0" aria-label="View Cam-A kit details">
+      <div class="kit-content" onclick="showKitDetail(0)" role="button" tabindex="0" aria-label="View Cam-A kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit1.mp4" type="video/mp4">
             <div class="placeholder-img">Cam-A Kit Video</div>
           </video>
+        </div>
+        <div class="kit-text">
+          <h3 id="cam-a-title">Cam-A: Rotational motion</h3>
+          <p>Demonstrates how cams convert rotational motion into linear oscillatory motion using contoured surfaces to drive followers in precise, complex patterns.</p>
         </div>
       </div>
     </section>
 
     <!-- Cam-C Kit Section -->
     <section class="kit-section" aria-labelledby="cam-c-title">
-      <div class="kit-content reverse">
-        <div class="kit-image" onclick="showKitDetail(1)" role="button" tabindex="0" aria-label="View Cam-C kit details">
+      <div class="kit-content" onclick="showKitDetail(1)" role="button" tabindex="0" aria-label="View Cam-C kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit2.mp4" type="video/mp4">
             <div class="placeholder-img">Cam-C Kit Video</div>
           </video>
         </div>
         <div class="kit-text">
-          <h3 id="cam-c-title">Cam-C: Get to know more about intermittent motion</h3>
+          <h3 id="cam-c-title">Cam-C: Intermittent motion</h3>
           <p>Shows how a Geneva wheel mechanism creates precise, timed intermittent motion from continuous rotational input using pins and slots.</p>
         </div>
       </div>
@@ -1127,31 +700,31 @@
 
     <!-- Crank Kit Section -->
     <section class="kit-section" aria-labelledby="crank-title">
-      <div class="kit-content">
-        <div class="kit-text">
-          <h3 id="crank-title">Crank: Understanding reciprocating motion</h3>
-          <p>Illustrates how a rotating crank arm converts rotational motion into linear back-and-forth movement through connecting rods.</p>
-        </div>
-        <div class="kit-image" onclick="showKitDetail(2)" role="button" tabindex="0" aria-label="View Crank kit details">
+      <div class="kit-content" onclick="showKitDetail(2)" role="button" tabindex="0" aria-label="View Crank kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit3.mp4" type="video/mp4">
             <div class="placeholder-img">Crank Kit Video</div>
           </video>
+        </div>
+        <div class="kit-text">
+          <h3 id="crank-title">Crank: Reciprocating motion</h3>
+          <p>Illustrates how a rotating crank arm converts rotational motion into linear back-and-forth movement through connecting rods.</p>
         </div>
       </div>
     </section>
 
     <!-- Gear-A Kit Section -->
     <section class="kit-section" aria-labelledby="gear-a-title">
-      <div class="kit-content reverse">
-        <div class="kit-image" onclick="showKitDetail(3)" role="button" tabindex="0" aria-label="View Gear-A kit details">
+      <div class="kit-content" onclick="showKitDetail(3)" role="button" tabindex="0" aria-label="View Gear-A kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit4.mp4" type="video/mp4">
             <div class="placeholder-img">Gear-A Kit Video</div>
           </video>
         </div>
         <div class="kit-text">
-          <h3 id="gear-a-title">Gear-A: Exploring perpendicular power transmission</h3>
+          <h3 id="gear-a-title">Gear-A: Perpendicular transmission</h3>
           <p>Demonstrates how bevel gears with cone-shaped teeth transfer rotational motion between perpendicular shafts at 90-degree angles.</p>
         </div>
       </div>
@@ -1159,32 +732,32 @@
 
     <!-- Gear-B Kit Section -->
     <section class="kit-section" aria-labelledby="gear-b-title">
-      <div class="kit-content">
-        <div class="kit-text">
-          <h3 id="gear-b-title">Gear-B: Variable speed and torque systems</h3>
-          <p>Shows how gear alignment and shape create variable speed and torque output from constant input through dynamic load distribution.</p>
-        </div>
-        <div class="kit-image" onclick="showKitDetail(4)" role="button" tabindex="0" aria-label="View Gear-B kit details">
+      <div class="kit-content" onclick="showKitDetail(4)" role="button" tabindex="0" aria-label="View Gear-B kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit5.mp4" type="video/mp4">
             <div class="placeholder-img">Gear-B Kit Video</div>
           </video>
+        </div>
+        <div class="kit-text">
+          <h3 id="gear-b-title">Gear-B: Variable speed &amp; torque</h3>
+          <p>Shows how gear alignment and shape create variable speed and torque output from constant input through dynamic load distribution.</p>
         </div>
       </div>
     </section>
 
     <!-- Gear-C Kit Section -->
     <section class="kit-section" aria-labelledby="gear-c-title">
-      <div class="kit-content reverse">
-        <div class="kit-image" onclick="showKitDetail(5)" role="button" tabindex="0" aria-label="View Gear-C kit details">
+      <div class="kit-content" onclick="showKitDetail(5)" role="button" tabindex="0" aria-label="View Gear-C kit details">
+        <div class="kit-image">
           <video class="kit-video" autoplay muted loop playsinline>
             <source src="images/kit6.mp4" type="video/mp4">
             <div class="placeholder-img">Gear-C Kit Video</div>
           </video>
         </div>
         <div class="kit-text">
-          <h3 id="gear-c-title">Gear-C: Mastering worm gear systems</h3>
-          <p>Gear-C is a worm gear system that converts rotational motion while significantly reducing speed & increasing torque. A screw-like worm drives a worm wheel, transferring motion at 90°. This design offers high torque output & a self-locking feature, so it can't be back-driven. Used in elevators, conveyors, tuning mechanisms—anywhere controlled motion & torque multiplication are vital.</p>
+          <h3 id="gear-c-title">Gear-C: Worm gear system</h3>
+          <p>Gear-C is a worm gear system that converts rotational motion while significantly reducing speed and increasing torque.</p>
         </div>
       </div>
     </section>
@@ -1203,124 +776,55 @@
         <div class="kit-detail-text">
           <h2 id="kit-detail-title">Kit Name</h2>
           <p id="kitDetailDesc">Kit description will appear here.</p>
+
+          <div class="kit-detail-assets">
+            <button class="download-button" id="kitManualDlBtn" aria-label="Download kit manual">Download Manual</button>
+            <button class="download-button" id="kitModelDlBtn" aria-label="Download kit 3D model">Download 3D Model</button>
+          </div>
+
           <button class="back-button" id="kitBackHomeBtn" aria-label="Return to home screen">Back to Home</button>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Manuals Screen -->
- <!-- Updated Manuals Screen HTML -->
-<section id="manualsScreen" class="modal-screen" role="main" aria-labelledby="manuals-title">
-  <div class="modal-header">
-    <button class="modal-close-button" id="closeManualsBtn" aria-label="Close manuals screen">← Back</button>
-    <div class="modal-title" id="manuals-title">Manuals</div>
-    <div class="modal-subtitle">Download comprehensive guides for each mechanical kit</div>
-  </div>
-  <div class="modal-content">
-    <div class="content-grid">
-      
-      <!-- Cam-A Manual -->
-      <div class="content-card">
-        <h3>Cam-A Manual</h3>
-        <p>Complete assembly instructions and theory guide for the Cam-A rotational motion kit. Includes part diagrams, assembly steps, and engineering principles.</p>
-        <button class="download-button" onclick="downloadManualPDF('1')" aria-label="Download Cam-A manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-      <!-- Cam-C Manual -->
-      <div class="content-card">
-        <h3>Cam-C Manual</h3>
-        <p>Geneva wheel mechanism guide covering intermittent motion principles, assembly procedures, and practical applications in machinery.</p>
-        <button class="download-button" onclick="downloadManualPDF('2')" aria-label="Download Cam-C manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-      <!-- Crank Manual -->
-      <div class="content-card">
-        <h3>Crank Manual</h3>
-        <p>Reciprocating motion system manual with detailed explanations of crank mechanisms, connecting rods, and motion conversion principles.</p>
-        <button class="download-button" onclick="downloadManualPDF('3')" aria-label="Download Crank manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-      <!-- Gear-A Manual -->
-      <div class="content-card">
-        <h3>Gear-A Manual</h3>
-        <p>Bevel gear system guide explaining perpendicular power transmission, gear ratios, and 90-degree motion transfer applications.</p>
-        <button class="download-button" onclick="downloadManualPDF('4')" aria-label="Download Gear-A manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-      <!-- Gear-B Manual -->
-      <div class="content-card">
-        <h3>Gear-B Manual</h3>
-        <p>Variable speed gear system manual covering dynamic load distribution, torque variation, and adaptive transmission concepts.</p>
-        <button class="download-button" onclick="downloadManualPDF('5')" aria-label="Download Gear-B manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-      <!-- Gear-C Manual -->
-      <div class="content-card">
-        <h3>Gear-C Manual</h3>
-        <p>Worm gear system comprehensive guide including self-locking mechanisms, torque multiplication, and precision control applications.</p>
-        <button class="download-button" onclick="downloadManualPDF('6')" aria-label="Download Gear-C manual">
-          📄 Download Manual
-        </button>
-      </div>
-      
-    </div>
-  </div>
-</section>
-
-  <!-- Models Screen -->
-  <section id="modelsScreen" class="modal-screen" role="main" aria-labelledby="models-title">
+  <!-- Library Screen — combined Manuals + 3D Models split view -->
+  <section id="manualsScreen" class="modal-screen" role="main" aria-labelledby="library-title">
     <div class="modal-header">
-      <button class="modal-close-button" id="closeModelsBtn" aria-label="Close models screen">← Back</button>
-      <div class="modal-title" id="models-title">3D Models</div>
-      <div class="modal-subtitle">Download and explore the 3D models used in AR experiences</div>
+      <button class="modal-close-button" id="closeManualsBtn" aria-label="Close library">Back</button>
+      <div class="modal-title" id="library-title">Library</div>
+      <div class="modal-subtitle">Manuals and 3D models for every kit</div>
     </div>
-    <div class="modal-content">
-      <div class="content-grid">
-        <div class="content-card">
-          <h3>Cam-A 3D Model</h3>
-          <p>High-resolution STL model of the cam mechanism. Compatible with 3D printers and CAD software for further analysis and modification.</p>
-          <button class="download-button" onclick="downloadModel('1')" aria-label="Download Cam-A 3D model">Download STL</button>
+
+    <div class="modal-content split-content">
+      <div class="split-pane">
+        <div class="split-pane-header">
+          <h2 class="split-pane-title">Manuals</h2>
         </div>
-        <div class="content-card">
-          <h3>Cam-C 3D Model</h3>
-          <p>Geneva wheel mechanism 3D model including drive wheel and indexed output wheel. Perfect for educational demonstrations and prototyping.</p>
-          <button class="download-button" onclick="downloadModel('2')" aria-label="Download Cam-C 3D model">Download STL</button>
+        <div class="split-pane-list">
+          <div class="resource-row"><div class="resource-info"><h3>Cam-A</h3></div><button class="download-button compact" onclick="downloadManualPDF('1')" aria-label="Download Cam-A manual">PDF</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Cam-C</h3></div><button class="download-button compact" onclick="downloadManualPDF('2')" aria-label="Download Cam-C manual">PDF</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Crank</h3></div><button class="download-button compact" onclick="downloadManualPDF('3')" aria-label="Download Crank manual">PDF</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-A</h3></div><button class="download-button compact" onclick="downloadManualPDF('4')" aria-label="Download Gear-A manual">PDF</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-B</h3></div><button class="download-button compact" onclick="downloadManualPDF('5')" aria-label="Download Gear-B manual">PDF</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-C</h3></div><button class="download-button compact" onclick="downloadManualPDF('6')" aria-label="Download Gear-C manual">PDF</button></div>
         </div>
-        <div class="content-card">
-          <h3>Crank 3D Model</h3>
-          <p>Complete crank mechanism model with connecting rod and slider components. Ideal for studying reciprocating motion systems.</p>
-          <button class="download-button" onclick="downloadModel('3')" aria-label="Download Crank 3D model">Download STL</button>
+      </div>
+
+      <div class="split-divider" aria-hidden="true"></div>
+
+      <div class="split-pane">
+        <div class="split-pane-header">
+          <h2 class="split-pane-title">3D Models</h2>
         </div>
-        <div class="content-card">
-          <h3>Gear-A 3D Model</h3>
-          <p>Precision bevel gear set model demonstrating 90-degree power transmission. Suitable for mechanical engineering education and analysis.</p>
-          <button class="download-button" onclick="downloadModel('4')" aria-label="Download Gear-A 3D model">Download STL</button>
-        </div>
-        <div class="content-card">
-          <h3>Gear-B 3D Model</h3>
-          <p>Variable speed gear system model showcasing dynamic torque distribution and non-uniform motion characteristics.</p>
-          <button class="download-button" onclick="downloadModel('5')" aria-label="Download Gear-B 3D model">Download STL</button>
-        </div>
-        <div class="content-card">
-          <h3>Gear-C 3D Model</h3>
-          <p>Worm gear assembly model featuring self-locking mechanism and high torque multiplication ratio components.</p>
-          <button class="download-button" onclick="downloadModel('6')" aria-label="Download Gear-C 3D model">Download STL</button>
-        </div>
-        <div class="content-card">
-          <h3>Base Platform Model</h3>
-          <p>Universal base platform for mounting and testing all mechanical kits. Includes standardized mounting points and measurement references for educational experiments.</p>
-          <button class="download-button" onclick="downloadModel('7')" aria-label="Download Base Platform 3D model">Download STL</button>
+        <div class="split-pane-list">
+          <div class="resource-row"><div class="resource-info"><h3>Cam-A</h3></div><button class="download-button compact" onclick="downloadModel('1')" aria-label="Download Cam-A 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Cam-C</h3></div><button class="download-button compact" onclick="downloadModel('2')" aria-label="Download Cam-C 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Crank</h3></div><button class="download-button compact" onclick="downloadModel('3')" aria-label="Download Crank 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-A</h3></div><button class="download-button compact" onclick="downloadModel('4')" aria-label="Download Gear-A 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-B</h3></div><button class="download-button compact" onclick="downloadModel('5')" aria-label="Download Gear-B 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Gear-C</h3></div><button class="download-button compact" onclick="downloadModel('6')" aria-label="Download Gear-C 3D model">STL</button></div>
+          <div class="resource-row"><div class="resource-info"><h3>Base Platform</h3></div><button class="download-button compact" onclick="downloadModel('7')" aria-label="Download Base Platform 3D model">STL</button></div>
         </div>
       </div>
     </div>
@@ -1350,7 +854,7 @@
     <div class="ar-header">
       <p><strong>Instructions:</strong> Point your camera at a kit marker to see the 3D demonstration</p>
     </div>
-    <button class="ar-back-button" id="backHomeBtn">← Home</button>
+    <button class="ar-back-button" id="backHomeBtn">Home</button>
     <button class="ar-help-button" id="arHelpBtn">Help</button>
 
     <!-- Left panel for additional coverage -->
@@ -1427,7 +931,7 @@
   <!-- AI Screen - Horizontal Card Layout -->
   <section id="aiScreen" class="modal-screen" role="main" aria-labelledby="ai-title">
 <header class="ai-header">
-    <button class="ai-close-button" onclick="closeAI()">← Back</button>
+    <button class="ai-close-button" onclick="closeAI()">Back</button>
     <h1 class="ai-header-title">AI</h1>
     <p class="ai-header-subtitle">Create unique AR scenarios to explore different mechanical systems</p>
   </header>
@@ -1445,7 +949,7 @@
           <div class="custom-dropdown">
             <button class="dropdown-trigger" onclick="toggleDropdown('models')">
               <span id="modelsSelected">Select Model</span>
-              <span class="dropdown-arrow">▼</span>
+              <span class="dropdown-arrow" aria-hidden="true"></span>
             </button>
             <div class="dropdown-menu" id="modelsDropdown">
               <div class="dropdown-option" onclick="selectOption('models', 'String Ray', 'string-ray.png')">String Ray</div>
@@ -1479,7 +983,7 @@
           <div class="custom-dropdown">
             <button class="dropdown-trigger" onclick="toggleDropdown('kit1')">
               <span id="kit1Selected">Select Kit 1</span>
-              <span class="dropdown-arrow">▼</span>
+              <span class="dropdown-arrow" aria-hidden="true"></span>
             </button>
             <div class="dropdown-menu" id="kit1Dropdown">
               <div class="dropdown-option" onclick="selectOption('kit1', 'Cam-A Model', 'kit1.png')">Cam-A Model</div>
@@ -1513,7 +1017,7 @@
           <div class="custom-dropdown">
             <button class="dropdown-trigger" onclick="toggleDropdown('kit2')">
               <span id="kit2Selected">Select Kit 2</span>
-              <span class="dropdown-arrow">▼</span>
+              <span class="dropdown-arrow" aria-hidden="true"></span>
             </button>
             <div class="dropdown-menu" id="kit2Dropdown">
               <div class="dropdown-option" onclick="selectOption('kit2', 'Cam-A Model', 'kit1.png')">Cam-A Model</div>
@@ -1560,7 +1064,7 @@
   <div id="pdfViewerModal" class="pdf-viewer-modal" role="dialog" aria-labelledby="pdf-viewer-title" aria-modal="true">
     <div class="pdf-viewer-header">
       <div class="pdf-viewer-title" id="pdf-viewer-title">Manual Viewer</div>
-      <button class="pdf-viewer-close" id="closePdfViewer" aria-label="Close PDF viewer">← Close</button>
+      <button class="pdf-viewer-close" id="closePdfViewer" aria-label="Close PDF viewer">Close</button>
     </div>
     <div class="pdf-viewer">
       <iframe id="pdfFrame" src="" title="PDF Viewer" aria-label="PDF document viewer"></iframe>
@@ -1573,24 +1077,31 @@
   </div>
 
 <section id="createScreen" class="modal-screen" role="main" aria-labelledby="create-title">
-  <!-- Header Section -->
-  <div class="modal-header">
-    <button class="modal-close-button" id="closeCreateBtn" aria-label="Close create screen">← Back</button>
+  <!-- Header: Back + stepper -->
+  <div class="modal-header wizard-header">
+    <button class="modal-close-button" id="closeCreateBtn" aria-label="Close create screen">Back</button>
     <div class="modal-header-center">
-      <div class="modal-title" id="create-title">Create Your Own AR Models</div>
-      <div class="modal-subtitle">Create your own unique AR models and markers</div>
+      <div class="modal-title" id="create-title">Create</div>
+      <div class="wizard-progress" aria-hidden="true">
+        <span class="wizard-dot" data-step="1"></span>
+        <span class="wizard-dot" data-step="2"></span>
+        <span class="wizard-dot" data-step="3"></span>
+        <span class="wizard-dot" data-step="4"></span>
+      </div>
     </div>
-    
+    <div class="wizard-step-label">Step <span id="wizardStepIndex">1</span> of 4</div>
   </div>
 
-  <!-- Camera Section -->
-   
-  <div class="create-section">
-    <h3>Capture Animation Grid</h3>
-    <div class="create-status" id="createStatus">Starting camera...</div>
-    
-    <div class="create-camera-container">
-      <div class="create-camera-box">
+  <div class="wizard" id="createWizard">
+
+    <!-- STEP 1: Full camera capture -->
+    <section class="wizard-step active" data-step="1" aria-labelledby="step1-title">
+      <div class="wizard-step-head">
+        <h2 id="step1-title">Capture frames</h2>
+        <p>Point the camera at each assembly step. Capture as many frames as you need.</p>
+      </div>
+      <div class="create-status" id="createStatus">Starting camera...</div>
+      <div class="create-camera-box wizard-camera-box">
         <video id="createVideo" autoplay muted playsinline></video>
         <div class="create-grid">
           <div class="create-cell"></div>
@@ -1601,59 +1112,70 @@
           <div class="create-cell create-golden"></div>
         </div>
       </div>
-      
-      <div class="create-controls">
-        <button id="createCapture" class="create-capture-btn" disabled>
-          Capture Assembly Step
-        </button>
-        <button id="createClear" class="create-clear-btn" style="display: none;">
-          Clear All Frames
-        </button>
+      <div class="wizard-actions">
+        <button id="createCapture" class="create-capture-btn" disabled>Capture Assembly Step</button>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Results Section -->
-  <div class="create-section" id="createResultsSection" style="display: none;">
-    <h3>Captured Animation Frames</h3>
-    <div class="create-instructions">
-      <p>Individual frames captured from the golden grid area</p>
-      <p>Click any frame to download, or use the animation controls below</p>
-    </div>
-    <div class="create-results" id="createResults"></div>
-  </div>
+    <!-- STEP 2: Save to cloud library OR scratch -->
+    <section class="wizard-step" data-step="2" aria-labelledby="step2-title">
+      <div class="wizard-step-head">
+        <h2 id="step2-title">Save or scratch</h2>
+        <p>Save these frames to your cloud library, or scratch them and start over.</p>
+      </div>
+      <div class="create-results" id="createResults"></div>
+      <div class="wizard-actions wizard-actions-split">
+        <button class="wizard-back" data-goto="1">Back</button>
+        <button id="createClear" class="create-clear-btn wizard-secondary">Scratch</button>
+        <button id="wizardSaveCloudBtn" class="wizard-primary">Save to Library</button>
+        <button class="wizard-next" data-goto="3">Next</button>
+      </div>
+    </section>
 
-  <!-- Animation Section -->
-  <div class="create-section" id="createAnimSection" style="display: none;">
-    <h3>Assembly Animation</h3>
-    <div class="create-animation-container">
+    <!-- STEP 3: Playback + speed adjustment -->
+    <section class="wizard-step" data-step="3" aria-labelledby="step3-title">
+      <div class="wizard-step-head">
+        <h2 id="step3-title">Adjust playback</h2>
+        <p>Preview the animation and tune its speed.</p>
+      </div>
       <div class="create-animation-box">
         <img id="createAnimFrame" src="" alt="Assembly animation frame">
         <div class="create-animation-overlay" id="createAnimOverlay">
-          <span>No animation yet - capture some steps above!</span>
+          <span>Capture frames in step 1 before previewing here.</span>
         </div>
       </div>
-      
       <div class="create-animation-controls">
-        <button id="createPlayPause" disabled>▶ Play</button>
-        <button id="createResetAnim" disabled>⏹ Reset</button>
+        <button id="createPlayPause" disabled>Play</button>
+        <button id="createResetAnim" disabled>Reset</button>
         <label>
-          Speed: <input type="range" id="createSpeedSlider" min="200" max="2000" value="500" disabled>
+          Speed
+          <input type="range" id="createSpeedSlider" min="200" max="2000" value="500" disabled>
           <span id="createSpeedDisplay">500ms</span>
         </label>
       </div>
-    </div>
+      <div class="wizard-actions">
+        <button class="wizard-back" data-goto="2">Back</button>
+        <button class="wizard-next" data-goto="4">Next</button>
+      </div>
+    </section>
+
+    <!-- STEP 4: Return home or go to AR -->
+    <section class="wizard-step" data-step="4" aria-labelledby="step4-title">
+      <div class="wizard-step-head">
+        <h2 id="step4-title">You're all set</h2>
+        <p>Return to the home page, or view your animation in AR.</p>
+      </div>
+      <div class="wizard-exit">
+        <button id="wizardHomeBtn" class="wizard-exit-btn">Return Home</button>
+        <button id="createOpenARBtn" class="wizard-exit-btn wizard-exit-btn-primary" aria-label="Open AR to view created animations">Open AR Experience</button>
+      </div>
+      <div class="wizard-actions">
+        <button class="wizard-back" data-goto="3">Back</button>
+        <button id="animLibraryTopBtn" class="wizard-tertiary" aria-label="Open animation library">Animation Library</button>
+      </div>
+    </section>
+
   </div>
-
-  <!-- Bottom AR Button -->
-<div class="create-ar-button-container">
-  <button class="animation-library-btn" id="animLibraryTopBtn" aria-label="Open animation library">Animation Library</button>
-
-  <button class="create-ar-button" id="createOpenARBtn" aria-label="Open AR to view created animations">
-    🚀 Open AR Experience
-  </button>
-</div>
-
 </section>
 
 
@@ -1845,24 +1367,24 @@
       
       // Check for model selection
       if (selectedOptions.models.name) {
-        content += '🎯 **3D MODEL SELECTED:**\n' + scenarioData.models[selectedOptions.models.name] + '\n\n';
+        content += '3D MODEL SELECTED:\n' + scenarioData.models[selectedOptions.models.name] + '\n\n';
         hasSelections = true;
       }
-      
+
       // Check for kit1 selection
       if (selectedOptions.kit1.name) {
-        content += '⚙️ **KIT 1 SELECTED:**\n' + scenarioData.kits[selectedOptions.kit1.name] + '\n\n';
+        content += 'KIT 1 SELECTED:\n' + scenarioData.kits[selectedOptions.kit1.name] + '\n\n';
         hasSelections = true;
       }
-      
+
       // Check for kit2 selection
       if (selectedOptions.kit2.name) {
-        content += '🔧 **KIT 2 SELECTED:**\n' + scenarioData.kits[selectedOptions.kit2.name] + '\n\n';
+        content += 'KIT 2 SELECTED:\n' + scenarioData.kits[selectedOptions.kit2.name] + '\n\n';
         hasSelections = true;
       }
-      
+
       if (hasSelections) {
-        content += '✨ **SCENARIO SUMMARY:**\nCombine these elements to create an engaging AR learning experience. The marine model provides visual appeal while the mechanical kits demonstrate engineering principles. Use AR markers to activate each component and explore their interactions.';
+        content += 'SCENARIO SUMMARY:\nCombine these elements to create an engaging AR learning experience. The marine model provides visual appeal while the mechanical kits demonstrate engineering principles. Use AR markers to activate each component and explore their interactions.';
       } else {
         content = 'Welcome to AutomatAR AI Assistant! Select options from the cards above to create your custom mechanical engineering scenario.\n\nEach selection will provide detailed information about the components, assembly instructions, and educational objectives.\n\nClick on any dropdown menu to begin exploring our mechanical engineering resources.';
       }
@@ -1992,7 +1514,7 @@ class CohereAITester {
   }
 
   buildScenario(seaModel, kit1, kit2) {
-    // 🎯 Mechanism hierarchy (winner determination)
+    // Mechanism hierarchy (winner determination)
     const mechanismPower = {
       "Worm Gear": 5, 
       "Crank": 4, 
@@ -2080,7 +1602,7 @@ async function tryAutoGenerate() {
   const k1 = selectedOptions.kit1.name;
   const k2 = selectedOptions.kit2.name;
   if (sea && k1 && k2) {
-    document.getElementById('scenarioText').textContent = '🤖 Generating educational scenario...';
+    document.getElementById('scenarioText').textContent = 'Generating educational scenario...';
     
     // Hide answer section and show answer button
     hideAnswerSection();
@@ -2212,6 +1734,114 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <!-- Screen Reader Only Content -->
   <div class="sr-only" aria-live="polite" id="screen-reader-announcements"></div>
+
+  <!-- Nav highlight: mark the Home button active when the home screen is visible. -->
+  <script>
+    (function trackActiveNav() {
+      const homeScreen = document.getElementById('homeScreen');
+      const homeBtn    = document.getElementById('homeBtn');
+      const modals     = document.querySelectorAll('.modal-screen');
+      const arScreen   = document.getElementById('arScreen');
+      if (!homeBtn || !homeScreen) return;
+
+      function onHomeVisible() {
+        const homeShown = (homeScreen.style.display === 'block');
+        const anyModalActive = Array.from(modals).some(m => m.classList.contains('active'));
+        const arVisible = arScreen && arScreen.style.display === 'block';
+        const isHome = homeShown && !anyModalActive && !arVisible;
+        homeBtn.classList.toggle('active', isHome);
+        if (isHome) homeBtn.setAttribute('aria-current', 'page');
+        else homeBtn.removeAttribute('aria-current');
+      }
+
+      const mo = new MutationObserver(onHomeVisible);
+      mo.observe(homeScreen, { attributes: true, attributeFilter: ['style'] });
+      if (arScreen) mo.observe(arScreen, { attributes: true, attributeFilter: ['style'] });
+      modals.forEach(m => mo.observe(m, { attributes: true, attributeFilter: ['class'] }));
+
+      onHomeVisible();
+    })();
+  </script>
+
+  <!-- Create-screen wizard navigation -->
+  <script>
+    (function initCreateWizard() {
+      const wizard   = document.getElementById('createWizard');
+      if (!wizard) return;
+
+      const steps    = wizard.querySelectorAll('.wizard-step');
+      const dots     = document.querySelectorAll('.wizard-progress .wizard-dot');
+      const idxLabel = document.getElementById('wizardStepIndex');
+
+      function goto(step) {
+        step = Math.max(1, Math.min(4, Number(step) || 1));
+        steps.forEach(s => s.classList.toggle('active', Number(s.dataset.step) === step));
+        dots.forEach(d => {
+          const n = Number(d.dataset.step);
+          d.classList.toggle('current', n === step);
+          d.classList.toggle('done', n < step);
+        });
+        if (idxLabel) idxLabel.textContent = step;
+      }
+
+      wizard.addEventListener('click', (e) => {
+        const trg = e.target.closest('.wizard-next, .wizard-back');
+        if (!trg) return;
+        goto(trg.dataset.goto);
+      });
+
+      // Auto-advance to step 2 after a successful capture.
+      const captureBtn = document.getElementById('createCapture');
+      if (captureBtn) {
+        captureBtn.addEventListener('click', () => {
+          if (captureBtn.disabled) return;
+          // Let the capture() logic run first, then transition on the next frame.
+          setTimeout(() => goto(2), 350);
+        });
+      }
+
+      // Home action on step 4
+      const homeBtn = document.getElementById('wizardHomeBtn');
+      if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
+          if (window.App && window.App.screenManager) {
+            window.App.screenManager.switchTo('HOME');
+          } else if (typeof showHomeScreen === 'function') {
+            showHomeScreen();
+          }
+        });
+      }
+
+      // Save to Library button — forward to CreateManager.saveToLibrary()
+      const saveBtn = document.getElementById('wizardSaveCloudBtn');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          const mgr = (window.AppState && window.AppState.createManager)
+            || (window.App && window.App.createManager)
+            || window.createManager;
+          if (mgr && typeof mgr.saveToLibrary === 'function') {
+            mgr.saveToLibrary();
+          } else {
+            // Fallback: find and click the dynamic save button inside #createResults
+            const dyn = document.querySelector('#createResults button');
+            if (dyn) dyn.click();
+          }
+        });
+      }
+
+      // Reset wizard to step 1 whenever the Create screen is shown.
+      const screen = document.getElementById('createScreen');
+      if (screen) {
+        const mo = new MutationObserver(() => {
+          if (screen.classList.contains('active')) goto(1);
+        });
+        mo.observe(screen, { attributes: true, attributeFilter: ['class'] });
+      }
+
+      goto(1);
+    })();
+  </script>
+
 
 </body>
 </html>
