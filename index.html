@@ -29,6 +29,7 @@
   <link rel="stylesheet" href="styles/ar.css">
   <link rel="stylesheet" href="styles/create.css">
   <link rel="stylesheet" href="styles/pdf-viewer.css">
+  <link rel="stylesheet" href="styles/contact.css">
   
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -645,7 +646,6 @@
   <!-- Header -->
   <header class="header-bar" id="mainHeader">
     <div class="header-content">
-      <div></div>
       <h1>AutomatAR</h1>
       <nav class="header-buttons" role="navigation" aria-label="Main navigation">
         <button class="header-button" id="homeBtn" aria-label="Return to home page">Home</button>
@@ -653,6 +653,7 @@
         <button class="header-ar-button" id="openARBtn" aria-label="Open augmented reality experience">AR</button>
         <button class="header-button" id="aiBtn" aria-label="AI learning assistant">AI</button>
       </nav>
+      <button class="header-contact-btn" id="contactBtn" aria-label="Contact us">Contact</button>
     </div>
   </header>
 
@@ -1730,6 +1731,37 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
+  </script>
+
+  <!-- Contact Us popup -->
+  <div id="contactPopup" class="contact-popup" role="dialog" aria-modal="true" aria-labelledby="contact-title" hidden>
+    <div class="contact-content">
+      <button class="contact-close" id="contactCloseBtn" aria-label="Close contact popup">×</button>
+      <h2 class="contact-title" id="contact-title">Contact Us</h2>
+      <dl class="contact-list">
+        <dt>Email</dt>
+        <dd><a href="mailto:hisarcs@hisarschool.k12.tr">hisarcs@hisarschool.k12.tr</a></dd>
+        <dt>Instagram</dt>
+        <dd><a href="https://instagram.com/hisarcs" target="_blank" rel="noopener">@hisarcs</a></dd>
+      </dl>
+    </div>
+  </div>
+
+  <script>
+    (function setupContactPopup() {
+      const popup = document.getElementById('contactPopup');
+      const openBtn = document.getElementById('contactBtn');
+      const closeBtn = document.getElementById('contactCloseBtn');
+      if (!popup || !openBtn || !closeBtn) return;
+
+      const open = () => { popup.hidden = false; requestAnimationFrame(() => popup.classList.add('open')); };
+      const close = () => { popup.classList.remove('open'); setTimeout(() => { popup.hidden = true; }, 200); };
+
+      openBtn.addEventListener('click', open);
+      closeBtn.addEventListener('click', close);
+      popup.addEventListener('click', (e) => { if (e.target === popup) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !popup.hidden) close(); });
+    })();
   </script>
 
   <!-- Screen Reader Only Content -->
