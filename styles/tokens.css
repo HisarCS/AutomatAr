@@ -7,16 +7,16 @@
   --brand-light: #FFB74D;
   --brand-tint: #FFF3E0;
 
-  --bg: #14100B;
-  --bg-elev: #1C1712;
-  --bg-elev-2: #251E16;
+  --bg: #FFE4EC;
+  --bg-elev: #FFD0DC;
+  --bg-elev-2: #FFBCCD;
 
-  --text: #F5EFE8;
-  --text-soft: rgba(245, 239, 232, 0.7);
-  --text-muted: rgba(245, 239, 232, 0.5);
+  --text: #3D1421;
+  --text-soft: rgba(61, 20, 33, 0.75);
+  --text-muted: rgba(61, 20, 33, 0.55);
 
-  --hairline: rgba(255, 255, 255, 0.08);
-  --hairline-strong: rgba(255, 255, 255, 0.14);
+  --hairline: rgba(61, 20, 33, 0.12);
+  --hairline-strong: rgba(61, 20, 33, 0.22);
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.35);

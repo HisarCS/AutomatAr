@@ -144,7 +144,7 @@
   transform: translateX(-50%);
   z-index: 10;
   padding: 0.4rem 0.9rem;
-  background: rgba(20, 16, 11, 0.78);
+  background: rgba(255, 188, 205, 0.78);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   color: var(--text);

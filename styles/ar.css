@@ -27,7 +27,7 @@
   );
   z-index: 10;
   padding: 0.55rem 1rem;
-  background: #1A140E;
+  background: #FFD0DC;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   color: var(--text);
@@ -154,7 +154,7 @@
   width: clamp(250px, 35vw, 450px);
   height: 100%;
   padding: 1.25rem 1.25rem 1.5rem;
-  background: #1A140E;
+  background: #FFD0DC;
   border-left: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
